@@ -3329,16 +3329,6 @@ python reports/acceptance.py \
 
 ---
 
-## 13) Implementation checklist
-
-**Short answer:** Append my blocks **after** your existing text. Don’t delete anything unless I say “replace/overwrite.”
-
----
-
-Below is the **single drop-in block** to paste **directly under your plan’s “## 13) Implementation checklist”** section. It expands only that section with ordered, bite-sized tasks, exact file paths, outputs, and parallelization notes. Copy/paste once.
-
----
-
 # 13) Implementation checklist
 
 ### Phase 0 — Repo scaffold (0.5–1h)
