@@ -10,33 +10,33 @@
     - _Reference: §1.6 in /Users/mac-main/Neural-Forecast/docs/forecasting_sf_plan.md_
 
   - [ ] 1.2 Implement utils/validate.py bootstrap stubs
-    - Copy exact implementation from §1.5 "Bootstrap stubs (drop-in file skeletons)"
+    - Implement per §1.5 "Bootstrap stubs (drop-in file skeletons)" (use plan's signatures; code can follow equivalent logic if no exact block is provided)
     - Write assert_regular_grid function with exact code from plan
     - Write assert_utc_eob function with exact code from plan  
     - Write assert_shifted function with exact code from plan
     - _Reference: §1.5 utils/validate.py in /Users/mac-main/Neural-Forecast/docs/forecasting_sf_plan.md_
 
   - [ ] 1.3 Implement utils/io.py bootstrap stubs
-    - Copy exact implementation from §1.5 "Bootstrap stubs (drop-in file skeletons)"
+    - Implement per §1.5 "Bootstrap stubs (drop-in file skeletons)"
     - Write load_canonical_frame function with exact code from plan
     - Write save_parquet function with exact code from plan
     - Write timestamped_path function with exact code from plan
     - _Reference: §1.5 utils/io.py in /Users/mac-main/Neural-Forecast/docs/forecasting_sf_plan.md_
 
   - [ ] 1.4 Implement nf_models/factory.py bootstrap stubs
-    - Copy exact implementation from §1.5 "Bootstrap stubs (drop-in file skeletons)"
+    - Implement per §1.5 "Bootstrap stubs (drop-in file skeletons)"
     - Write _make_loss function with exact code from plan
     - Write instantiate_models function with exact code from plan
     - Support NHITS, NBEATSx, TiDE, PatchTST with exact parameter wiring from plan
     - _Reference: §1.5 nf_models/factory.py in /Users/mac-main/Neural-Forecast/docs/forecasting_sf_plan.md_
 
   - [ ] 1.5 Implement cv/runner.py bootstrap stubs
-    - Copy exact implementation from §1.5 "Bootstrap stubs (drop-in file skeletons)"
+    - Implement per §1.5 "Bootstrap stubs (drop-in file skeletons)"
     - Write run_cv function with exact code from plan using NF-native cross_validation
     - _Reference: §1.5 cv/runner.py in /Users/mac-main/Neural-Forecast/docs/forecasting_sf_plan.md_
 
   - [ ] 1.6 Implement uq/diag.py bootstrap stubs
-    - Copy exact implementation from §1.5 "Bootstrap stubs (drop-in file skeletons)"
+    - Implement per §1.5 "Bootstrap stubs (drop-in file skeletons)"
     - Write compute_coverage function with exact code from plan
     - Write plot_pit function with exact code from plan
     - Write blend_equal function with exact code from plan
@@ -68,7 +68,7 @@
   - [ ] 3.2 Implement features/builder.py feature computation pipeline
     - Implement build_indicators function using vectorbt/TA-Lib primary, pandas-ta supplement per §3.1
     - Implement apply_mtf function with EOB alignment using label='right', closed='right' per §3.2
-    - Implement postprocess_shift_and_prune function with central shift(1) rule per §3.2 "compute → align → shift(1)"
+    - Implement postprocess_shift_and_prune function with central shift(1) rule per §3.2 "compute → align → shift(1)" (location: features/builder.py; keep consistent across docs)
     - Implement select_features function with ≥98% availability filter per §3.3 and ≤256 cap
     - Follow exact specifications from §3.4 "End-to-end assembly" for pipeline integration
     - Handle boundary cases per §3.6 "Hygiene & boundary cases you must enforce"
@@ -87,7 +87,7 @@
 - [ ] 5. Extend cross-validation and evaluation system beyond bootstrap stubs (from §5 Cross-validation NF-native)
   - [ ] 5.1 Extend cv/runner.py cross-validation execution
     - Extend bootstrap run_cv function per §5.1 "Windowing (per horizon) — exact NF arguments"
-    - Configure exact windowing: n_windows=6 for pilot, step_size=h, val_size=4*h, refit=True per §5.1
+  - Configure exact windowing: n_windows=6 for pilot, step_size=h, val_size=4*h, refit=True per §5.1; include conformal args: prediction_intervals=PredictionIntervals(n_windows=6), level=[80,90,95]
     - Add summarize_cv function per §5.2.D "Drop-in runner and aggregator"
     - Compute sCRPS as primary metric per §5.2.B "Primary metric: sCRPS (with MAE/RMSE as supporting)"
     - Return exact CV format per §5.2.A "What NF returns (you will aggregate, not recompute)"
@@ -113,6 +113,7 @@
     - Use exact model configurations from §9.1 example: NHITS, NBEATSx, TiDE, PatchTST with specified parameters
     - Configure exact loss specifications from plan: {kind: studentt} and {kind: mqloss, quantiles: [0.05,0.1,0.2,0.3,0.5,0.7,0.8,0.9,0.95]}
     - Set exact training parameters from plan: learning_rate=0.001, batch_size=512, max_steps=20000, early_stop_patience_steps=400
+  - Ensure artifact paths stable: experiments/h{h}/cv_results.parquet, experiments/h{h}/metrics.csv, experiments/h{h}/best/
     - _Reference: §9.1 experiments/h16.yaml example in /Users/mac-main/Neural-Forecast/docs/forecasting_sf_plan.md_
 
 - [ ] 8. Implement training workflow orchestration (from §1.7 Entry-point skeletons and §9.2)
@@ -122,7 +123,8 @@
     - Extend with command-line argument parsing per §9.2 "run_train.py — NF-native training"
     - Add insample predictions for PIT analysis using predict_insample(step_size=h, level=[80,90,95]) per §5.2.F
     - Implement CV results summarization with sCRPS as primary metric per §5.2.B
-    - Add model saving to experiments/h{h}/best/ using NF's native save per §5.2.I
+  - Add validation guard calls before NF.fit/cross_validation: assert_regular_grid, assert_utc_eob, assert_no_forward_fill_y, assert_shifted
+  - Add model saving to experiments/h{h}/best/ using NF's native save per §5.2.I
     - _Reference: §1.7 run_train.py skeleton and §9.2 in /Users/mac-main/Neural-Forecast/docs/forecasting_sf_plan.md_
 
   - [ ] 8.2 Create run_predict.py entry-point skeleton and extend to full inference
@@ -131,7 +133,8 @@
     - Extend with command-line argument parsing per §9.3 "run_predict.py — batch inference"
     - Add prediction interval generation at 80/90/95 levels per §10.3 "one-shot & loop modes"
     - Implement live loop mode with 45+ second buffer per §10.1 "What happens every 15 minutes"
-    - Add graceful error handling per §10.4 "Throughput & memory guards"
+  - Add validation guard calls before predict: assert_regular_grid, assert_utc_eob, assert_shifted
+  - Add graceful error handling per §10.4 "Throughput & memory guards"
     - _Reference: §1.7 run_predict.py skeleton, §9.3, §10.1, §10.3, §10.4 in /Users/mac-main/Neural-Forecast/docs/forecasting_sf_plan.md_
 
 - [ ] 9. Implement model selection and ensembling (from §7 Model selection & simple ensembling)
@@ -175,7 +178,7 @@
     - Implement 45+ second buffer per §10.1 and §14.14 "Live loop race conditions"
     - Add throughput & memory guards per §10.4 "Throughput & memory guards (graceful degradation)"
     - Implement live conformal & monitoring per §10.5 "Live conformal & monitoring hooks"
-    - Add minimal assertions per §10.6 "Minimal assertions in the live loop (don't skip)"
+  - Add minimal assertions per §10.6 "Minimal assertions in the live loop (don't skip)" and persist predictions under reports/h{h}/preds_*.parquet
     - _Reference: §10.1, §10.2, §10.3, §10.4, §10.5, §10.6 in /Users/mac-main/Neural-Forecast/docs/forecasting_sf_plan.md_
 
 - [ ] 12. Implement monitoring and maintenance system (from §11 Maintenance & retraining)

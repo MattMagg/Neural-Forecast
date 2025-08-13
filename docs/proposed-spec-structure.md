@@ -1,0 +1,383 @@
+# BTC Forecasting System - Proposed Spec Structure
+
+This document outlines the proposed breakdown of the BTC forecasting system into 14 manageable specifications for implementation. Each spec represents a distinct and manageable component that contributes to the overall system architecture.
+
+## Overview
+
+The BTC forecasting system is a complex probabilistic forecasting system using NeuralForecast for intraday Bitcoin predictions with calibrated prediction intervals. The system requires strict data discipline, feature engineering, cross-validation, uncertainty quantification, and production deployment capabilities.
+
+## Proposed Specification Breakdown
+
+### **Core Infrastructure Specs**
+
+#### **1. Data Processing and Validation Spec**
+**Purpose:** Data contracts, regularization, and validation utilities  
+**Core Components:**
+- UTC timestamp handling and grid regularization
+- Target computation (log returns) and data quality gates
+- Canonical NF frame creation with schema validation
+- Missing data handling and winsorization policies
+- Data validation utilities (assert_regular_grid, assert_utc_eob, assert_shifted)
+
+**Reference Sections in `docs/forecasting_sf_plan.md`:**
+- **Primary:** §2) Data contracts & validation (lines 584–783)
+  - §2.1 Canonical target frame (586–601)
+  - §2.2 Regularization & data hygiene (602–620)
+  - §2.3 Target and splits (621–626)
+  - §2.4 Canonical NF frame (627–676)
+  - §2.5 Regularization policy (677–713)
+  - §2.6 Deterministic seeding & data checks (714–729)
+  - §2.7 Assembly path (730–744)
+  - §2.8 Minimal integration diff (745–773)
+  - §2.9 Why this is correct (774–783)
+- **Supporting:** 
+  - §0.2 Bar finalization & time ordering (175–187)
+  - §0.3 Leakage discipline (188–198)
+  - §1.5 Bootstrap stubs - utils/validate.py (358–498)
+
+**Key Deliverables:** utils/validate.py, utils/io.py, canonical frame creation functions
+
+---
+
+#### **2. Feature Engineering Pipeline Spec**
+**Purpose:** Technical indicator registry and computation with leakage prevention  
+**Core Components:**
+- Technical indicator registry using vectorbt/TA-Lib
+- Multi-timeframe feature alignment and aggregation
+- Feature selection with ≤256 cap and ≥98% availability filter
+- Leakage prevention via strict shift(1) rule
+- NF exogenous variable wiring (hist/futr/stat lists)
+
+**Reference Sections in `docs/forecasting_sf_plan.md`:**
+- **Primary:** §3) Exogenous features (lines 784–1203)
+  - §3.1 Indicator registry (824–907)
+  - §3.2 Feature builder (908–1094)
+  - §3.3 Feature selection & hard cap (1095–1146)
+  - §3.4 End-to-end assembly (1147–1170)
+  - §3.5 NF wiring (1171–1184)
+  - §3.6 Hygiene & boundary cases (1185–1192)
+  - §3.7 Minimal tests (1193–1203)
+
+**Key Deliverables:** features/registry.py, features/builder.py, postprocess_shift_and_prune function
+
+---
+
+#### **3. NeuralForecast Model Factory Spec**
+**Purpose:** Model instantiation system for NF models  
+**Core Components:**
+- Model instantiation for NHITS, NBEATSx, TiDE, PatchTST
+- Loss function configuration (DistributionLoss, MQLoss, ISQF, IQLoss)
+- Training parameter management (batch_size, learning_rate, etc.)
+- Exogenous variable wiring (hist_exog_list, futr_exog_list, stat_exog_list)
+- Scaler configuration (robust, revin for PatchTST)
+
+**Reference Sections in `docs/forecasting_sf_plan.md`:**
+- **Primary:** §4) NeuralForecast model portfolio & defaults (lines 1204–1564)
+  - §4.0 Portfolio justification (1216–1239)
+  - §4.1 Common model parameters (1240–1330)
+  - §4.2 Model-specific configurations (1331–1564)
+- **Supporting:** §1.5 Bootstrap stubs - nf_models/factory.py (358–498)
+
+**Key Deliverables:** nf_models/factory.py, instantiate_models function, _make_loss function
+
+---
+
+### **Training and Evaluation Specs**
+
+#### **4. Cross-Validation and Metrics Spec**
+**Purpose:** NF-native cross-validation implementation and metrics computation  
+**Core Components:**
+- NF-native cross-validation with proper windowing
+- sCRPS computation as primary metric
+- CV windowing strategy per horizon (n_windows, step_size, val_size)
+- Metrics aggregation and leaderboard generation
+- Leakage prevention in CV setup
+
+**Reference Sections in `docs/forecasting_sf_plan.md`:**
+- **Primary:** §5) Cross-validation (NF-native) (lines 1565–1807)
+  - §5.1 Windowing per horizon (1587–1617)
+  - §5.2 Metrics, outputs, and artifacts (1618–1807)
+    - §5.2.A What NF returns (1632–1636)
+    - §5.2.B Primary metric: sCRPS (1637–1642)
+    - §5.2.C Coverage & PIT diagnostics (1643–1649)
+    - §5.2.D Drop-in runner (1650–1720)
+    - §5.2.E PIT helper (1721–1749)
+    - §5.2.F Training flow integration (1750–1786)
+    - §5.2.G Leakage discipline (1787–1795)
+    - §5.2.H Conformal attachment (1796–1801)
+    - §5.2.I Save/Load (1802–1807)
+- **Supporting:** 
+  - §0.4 Cross-validation semantics (199–216)
+  - §1.5 Bootstrap stubs - cv/runner.py (358–498)
+
+**Key Deliverables:** cv/runner.py, run_cv function, summarize_cv function
+
+---
+
+#### **5. Uncertainty Quantification Spec**
+**Purpose:** Probabilistic evaluation and calibration  
+**Core Components:**
+- Probabilistic evaluation and calibration assessment
+- PIT analysis and coverage diagnostics
+- Conformal prediction integration via NF's PredictionIntervals
+- Prediction interval generation at 80/90/95 levels
+- Coverage validation by volatility decile
+
+**Reference Sections in `docs/forecasting_sf_plan.md`:**
+- **Primary:** §8) Uncertainty & calibration (lines 2291–2431)
+  - §8.1 Quantile vs Distribution training (2295–2316)
+  - §8.2 Conformal prediction intervals (2317–2359)
+  - §8.3 Diagnostic checks (2360–2404)
+  - §8.4 Practical fixes (2405–2422)
+  - §8.5 What to persist (2423–2431)
+- **Supporting:** 
+  - §0.5 Probabilistic forecasts (217–246)
+  - §1.5 Bootstrap stubs - uq/diag.py (358–498)
+
+**Key Deliverables:** uq/diag.py, compute_coverage, plot_pit, coverage_by_vol_decile functions
+
+---
+
+#### **6. Training Workflow Orchestration Spec**
+**Purpose:** YAML-driven experiment configuration and training pipeline  
+**Core Components:**
+- YAML-driven experiment configuration system
+- Training pipeline orchestration (run_train.py)
+- Artifact management and model persistence
+- Experiment tracking and results organization
+- Insample diagnostics integration
+
+**Reference Sections in `docs/forecasting_sf_plan.md`:**
+- **Primary:** §9) Training & evaluation workflow (lines 2432–2757)
+  - §9.1 YAML-driven experiment configs (2477–2574)
+  - §9.2 run_train.py implementation (2575–2667)
+  - §9.3 run_predict.py implementation (2668–2737)
+  - §9.4 Artifacts & file layout (2738–2747)
+  - §9.5 Safety measures (2748–2757)
+- **Supporting:** 
+  - §1.6 Minimal settings.yaml (499–515)
+  - §1.7 Entry-point skeletons (516–583)
+
+**Key Deliverables:** run_train.py, experiments/*.yaml configs, artifact management system
+
+---
+
+### **Advanced Features Specs**
+
+#### **7. Model Selection and Ensembling Spec**
+**Purpose:** Model ranking and ensemble creation  
+**Core Components:**
+- Model ranking by mean sCRPS across CV windows
+- Top-2 ensemble creation with equal-weight averaging
+- Model promotion criteria (≥1% sCRPS improvement)
+- Ensemble inference and blending utilities
+- Performance tracking and selection protocols
+
+**Reference Sections in `docs/forecasting_sf_plan.md`:**
+- **Primary:** §7) Model selection & simple ensembling (lines 2142–2290)
+  - §7.1 Selection protocol (2156–2167)
+  - §7.2 Simple ensembles (2168–2182)
+  - §7.3 Drop-in utilities (2183–2242)
+  - §7.4 Workflow per horizon (2243–2256)
+  - §7.5 Final fit & save (2257–2270)
+  - §7.6 Inference path (2271–2279)
+  - §7.7 Guardrails (2280–2290)
+
+**Key Deliverables:** Model selection logic, blend_equal function, ensemble utilities
+
+---
+
+#### **8. Hyperparameter Optimization Spec**
+**Purpose:** Bounded search spaces and optimization strategy  
+**Core Components:**
+- Bounded, model-specific search spaces
+- Pilot → promote → full CV workflow
+- Promotion criteria (≥0.5% sCRPS improvement for advancement)
+- Resource management and early stopping
+- n_windows progression (6 → 10)
+
+**Reference Sections in `docs/forecasting_sf_plan.md`:**
+- **Primary:** §6) Hyperparameter strategy (lines 1808–2141)
+  - §6.1 Search spaces (1866–1946)
+  - §6.2 Pilot → promote → full CV (1947–1980)
+  - §6.3 Concrete glue (1981–2119)
+  - §6.4 Promotion thresholds (2120–2127)
+  - §6.5 Practical guards (2128–2135)
+  - §6.6 Optional NF Auto* (2136–2141)
+
+**Key Deliverables:** cv/hpo.py, search space definitions, promotion logic
+
+---
+
+### **Production and Deployment Specs**
+
+#### **9. Inference and Live Deployment Spec**
+**Purpose:** Real-time prediction pipeline and live deployment  
+**Core Components:**
+- Real-time prediction pipeline (run_predict.py)
+- Live loop implementation with 45+ second buffer
+- Tail feature building and prediction generation
+- One-shot and loop modes for inference
+- Graceful degradation and error handling
+
+**Reference Sections in `docs/forecasting_sf_plan.md`:**
+- **Primary:** §10) Inference & live deployment (lines 2758–2955)
+  - §10.1 15-minute sequence (2772–2788)
+  - §10.2 Tail builders (2789–2856)
+  - §10.3 run_predict.py modes (2857–2928)
+  - §10.4 Throughput & memory guards (2929–2936)
+  - §10.5 Live conformal & monitoring (2937–2941)
+  - §10.6 Minimal assertions (2942–2947)
+  - §10.7 Integration points (2948–2955)
+
+**Key Deliverables:** run_predict.py, live loop implementation, tail builders
+
+---
+
+#### **10. Monitoring and Maintenance Spec**
+**Purpose:** Performance monitoring and drift detection  
+**Core Components:**
+- Performance monitoring and drift detection
+- Retraining triggers and procedures
+- Rollback mechanisms and version management
+- Coverage drift tracking (±3pp deviation alerts)
+- sCRPS degradation monitoring (>3% vs baseline)
+- PSI thresholds for distribution shift (0.2 moderate, 0.3 major)
+
+**Reference Sections in `docs/forecasting_sf_plan.md`:**
+- **Primary:** §11) Maintenance & retraining (lines 2956–3135)
+  - §11.1 Cadence & triggers (2972–2987)
+  - §11.2 Versioning & pinning (2988–3029)
+  - §11.3 Smoke tests (3030–3044)
+  - §11.4 Drift & monitoring (3045–3093)
+  - §11.5 Retrain procedure (3094–3104)
+  - §11.6 Rollback (3105–3109)
+  - §11.7 Optional siblings (3110–3126)
+  - §11.8 House rules (3127–3135)
+
+**Key Deliverables:** Monitoring system, drift detection, retraining procedures
+
+---
+
+### **Quality and Risk Management Specs**
+
+#### **11. Risk Mitigation and Error Handling Spec**
+**Purpose:** Comprehensive error handling and risk mitigation  
+**Core Components:**
+- Comprehensive error handling strategies
+- Data quality safeguards and validation
+- Training stability and GPU memory management
+- MTF misalignment prevention
+- Leakage detection and prevention
+- Graceful degradation strategies
+
+**Reference Sections in `docs/forecasting_sf_plan.md`:**
+- **Primary:** §14) Risks & mitigations (lines 3493–3664)
+  - §14.1 MTF misalignment (3522–3532)
+  - §14.2 Leakage from non-shifted exogs (3533–3542)
+  - §14.3 Target mishandling (3543–3552)
+  - §14.4 Quantile crossing (3553–3561)
+  - §14.5 GPU OOM (3562–3571)
+  - §14.6 Training instability (3572–3581)
+  - §14.7 Bad data (3582–3591)
+  - §14.8–§14.15 Additional risks (3592–3664)
+
+**Key Deliverables:** Error handling framework, stability measures, risk mitigation utilities
+
+---
+
+#### **12. Quality Gates and Acceptance Testing Spec**
+**Purpose:** Acceptance criteria and quality validation  
+**Core Components:**
+- Acceptance criteria and quality thresholds
+- Automated testing and validation procedures
+- Acceptance reporting and promotion gates
+- Hard pass/fail gates per horizon
+- Rollback criteria for live deployment
+
+**Reference Sections in `docs/forecasting_sf_plan.md`:**
+- **Primary:** §12) Acceptance criteria & quality gates (lines 3136–3323)
+  - §12.1 Hard pass/fail gates (3156–3178)
+  - §12.2 Rollback criteria (3179–3187)
+  - §12.3 Acceptance report (3188–3307)
+  - §12.4 What to store (3308–3314)
+  - §12.5 Remediation guidance (3315–3323)
+
+**Key Deliverables:** Quality gates, acceptance tests, validation procedures
+
+---
+
+### **Integration and Configuration Specs**
+
+#### **13. Configuration Management Spec**
+**Purpose:** Settings management and project structure  
+**Core Components:**
+- Project structure and directory organization
+- Settings management and YAML configuration
+- Environment setup and dependency management
+- Bootstrap utilities and project scaffolding
+- Coding standards and conventions
+
+**Reference Sections in `docs/forecasting_sf_plan.md`:**
+- **Primary:** §1) Repository layout (lines 291–583)
+  - §1.1 Directory scaffold (293–310)
+  - §1.2 File inventory (311–334)
+  - §1.3 Naming conventions (335–349)
+  - §1.4 Coding standards (350–357)
+  - §1.5 Bootstrap stubs (358–498)
+  - §1.6 Minimal settings.yaml (499–515)
+  - §1.7 Entry-point skeletons (516–583)
+- **Supporting:** §0) Objectives & guardrails (132–290)
+
+**Key Deliverables:** Project structure, settings.yaml, bootstrap stubs
+
+---
+
+#### **14. Integration Testing and Validation Spec**
+**Purpose:** End-to-end pipeline testing and validation  
+**Core Components:**
+- End-to-end pipeline testing
+- Integration validation and smoke tests
+- Performance testing and benchmarking
+- Implementation phases and checkpoints
+- Definition of Done criteria
+
+**Reference Sections in `docs/forecasting_sf_plan.md`:**
+- **Primary:** §13) Implementation checklist (lines 3324–3492)
+  - Phase 0–11 implementation phases (see §13 body)
+  - Parallelization guide (see §13 body)
+  - Command quick sheet (see §13 body)
+  - Definition of Done (see §13 body)
+
+**Key Deliverables:** Integration tests, smoke tests, implementation phases
+
+---
+
+## Implementation Strategy
+
+### **Dependencies and Sequencing**
+
+1. **Foundation Layer** (Specs 1, 13): Data processing and configuration management
+2. **Core Features** (Specs 2, 3): Feature engineering and model factory
+3. **Training Infrastructure** (Specs 4, 5, 6): CV, UQ, and training workflow
+4. **Advanced Features** (Specs 7, 8): Model selection and HPO
+5. **Production Layer** (Specs 9, 10): Inference and monitoring
+6. **Quality Assurance** (Specs 11, 12, 14): Risk mitigation, quality gates, and testing
+
+### **Key Principles**
+
+- **NF-Native Approach**: Use NeuralForecast primitives exclusively
+- **Data Discipline**: Strict leakage prevention via shift(1) rule
+- **Probabilistic Focus**: Calibrated prediction intervals at 80/90/95 levels
+- **Production Ready**: Live deployment with monitoring and rollback capabilities
+- **Quality First**: Comprehensive testing and validation at every level
+
+### **Success Criteria**
+
+- Reproducible CV artifacts with sCRPS as primary metric
+- Saved model winners with proper versioning
+- 15-minute inference loop with calibrated prediction intervals
+- Acceptance reports showing ACCEPT for ≥2 horizons
+- Monitoring system with coverage within ±3pp of nominal levels
+
+This specification structure provides a systematic approach to implementing the complex BTC forecasting system while maintaining clear boundaries, dependencies, and quality standards throughout the development process.

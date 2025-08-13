@@ -127,40 +127,39 @@
   - [14.14 Live loop race conditions](#1414-live-loop-race-conditions)
   - [14.15 Regression after “harmless” refactors](#1415-regression-after-harmless-refactors)
 
-
 ---
 
 ## 0) Objectives & guardrails
 
-* **Primary objective:** High-quality *probabilistic* forecasts for BTC with calibrated **80%/90%/95%** prediction intervals, minimal data leakage, and repeatable training/evaluation. Forecast distributions (not just point estimates) are needed to quantify uncertainty.
+- **Primary objective:** High-quality *probabilistic* forecasts for BTC with calibrated **80%/90%/95%** prediction intervals, minimal data leakage, and repeatable training/evaluation. Forecast distributions (not just point estimates) are needed to quantify uncertainty.
 
-* **NF-centric rule:** Use **Nixtla’s NeuralForecast** (NF) library primitives wherever possible: deep models, distribution/quantile losses, built-in scalers, built-in cross-validation, conformal interval calibration, model persistence, etc. No custom re-implementations of features that NF already provides.
+- **NF-centric rule:** Use **Nixtla’s NeuralForecast** (NF) library primitives wherever possible: deep models, distribution/quantile losses, built-in scalers, built-in cross-validation, conformal interval calibration, model persistence, etc. No custom re-implementations of features that NF already provides.
 
-* **Data discipline:** Use **UTC** timestamps with each 15-min bar labeled by end-of-bar time. Regularize timestamps to a continuous 15-min grid (no missing intervals). **No forward-filling of target (y)** for missing bars. All *derived* features must obey a strict **compute → shift(1)** rule before joining with the target to avoid any lookahead leakage. If a feature can’t be lagged (e.g. future calendar info), treat it as future-known exogenous.
+- **Data discipline:** Use **UTC** timestamps with each 15-min bar labeled by end-of-bar time. Regularize timestamps to a continuous 15-min grid (no missing intervals). **No forward-filling of target (y)** for missing bars. All *derived* features must obey a strict **compute → shift(1)** rule before joining with the target to avoid any lookahead leakage. If a feature can’t be lagged (e.g. future calendar info), treat it as future-known exogenous.
 
-* **Base frequency:** **15-minute** bars (freq="15min" in NF terms).
+- **Base frequency:** **15-minute** bars (freq="15min" in NF terms).
 
-* **Forecast horizons (h):** \[4, 8, 16, 32\] steps ahead (equivalent to 1h, 2h, 4h, 8h into the future at 15-min frequency).
+- **Forecast horizons (h):** \[4, 8, 16, 32\] steps ahead (equivalent to 1h, 2h, 4h, 8h into the future at 15-min frequency).
 
-* **Context window (input_size):** Begin with **1024** past observations (≈10.7 days) for models like NHITS, NBEATSx, and TiDE; and **2048** for PatchTST (which benefits from longer context). Only increase these if validation metrics (especially sCRPS) improve appreciably – long histories cost more compute and risk overfitting.
+- **Context window (input_size):** Begin with **1024** past observations (≈10.7 days) for models like NHITS, NBEATSx, and TiDE; and **2048** for PatchTST (which benefits from longer context). Only increase these if validation metrics (especially sCRPS) improve appreciably – long histories cost more compute and risk overfitting.
 
 ### 0.1 Target, frequency, horizons (why and how)
 
-* **Target = log returns (default)**
+- **Target = log returns (default)**
 
-  * Definition: `y_t = log(close_t) - log(close_{t-1})`.
-  * Rationale: closer to stationary, reduces scale drift, and plays well with NF’s distributional losses (e.g., Student-t) and sCRPS evaluation. Distributional training is first-class in NF via `DistributionLoss`, with Student-t and other families supported; sCRPS is available for probabilistic evaluation.
-  * Presentation: if a downstream consumer requires **price** forecasts, exponentiate the cumulative forecasted returns from the last known price only at presentation time (never in training/CV).
+  - Definition: `y_t = log(close_t) - log(close_{t-1})`.
+  - Rationale: closer to stationary, reduces scale drift, and plays well with NF’s distributional losses (e.g., Student-t) and sCRPS evaluation. Distributional training is first-class in NF via `DistributionLoss`, with Student-t and other families supported; sCRPS is available for probabilistic evaluation.
+  - Presentation: if a downstream consumer requires **price** forecasts, exponentiate the cumulative forecasted returns from the last known price only at presentation time (never in training/CV).
 
-* **Base frequency:** `freq="15min"` globally (NF `NeuralForecast` core uses a pandas-compatible frequency string).
+- **Base frequency:** `freq="15min"` globally (NF `NeuralForecast` core uses a pandas-compatible frequency string).
 
-* **Horizons `h`:** `[4, 8, 16, 32]` → 1h, 2h, 4h, 8h ahead. Keep one model portfolio per `h` to respect horizon-specific error structure. Use NF’s `h` argument on each model instance.
+- **Horizons `h`:** `[4, 8, 16, 32]` → 1h, 2h, 4h, 8h ahead. Keep one model portfolio per `h` to respect horizon-specific error structure. Use NF’s `h` argument on each model instance.
 
-* **Context window (`input_size`):** start at `1024` bars for NHITS/NBEATSx/TiDE; `2048` for PatchTST. These are long enough to act as a de-facto embargo (see §0.4) and align with NF windowed models’ expectations.
+- **Context window (`input_size`):** start at `1024` bars for NHITS/NBEATSx/TiDE; `2048` for PatchTST. These are long enough to act as a de-facto embargo (see §0.4) and align with NF windowed models’ expectations.
 
 **Deliverables to add:**
 
-* In your plan’s **settings.yaml** (referenced later), add:
+- In your plan’s **settings.yaml** (referenced later), add:
 
   ```yaml
   freq: "15min"
@@ -175,38 +174,38 @@
 
 ### 0.2 Bar finalization & time ordering
 
-* **Bar policy:** all timestamps are **UTC end-of-bar** (EOB). The 15-minute bar ending at `10:00:00+00:00` covers `[09:45, 10:00)`. Resampling/rollups must use `label='right', closed='right'` (you’ll enforce this in the feature builders). This keeps causal ordering unambiguous for `hist_exog_list`. (We’ll wire `futr_exog_list` separately.) 
-* **Strict time ordering:** NF methods (`fit`, `cross_validation`, `predict`, `predict_insample`) respect chronological splits; you supply `val_size`, `n_windows`, `step_size`, and optionally `refit=True` to simulate live retrains.
+- **Bar policy:** all timestamps are **UTC end-of-bar** (EOB). The 15-minute bar ending at `10:00:00+00:00` covers `[09:45, 10:00)`. Resampling/rollups must use `label='right', closed='right'` (you’ll enforce this in the feature builders). This keeps causal ordering unambiguous for `hist_exog_list`. (We’ll wire `futr_exog_list` separately.)
+- **Strict time ordering:** NF methods (`fit`, `cross_validation`, `predict`, `predict_insample`) respect chronological splits; you supply `val_size`, `n_windows`, `step_size`, and optionally `refit=True` to simulate live retrains.
 
 **Deliverables to add:**
 
-* In **utils/validate.py**, you will implement:
+- In **utils/validate.py**, you will implement:
 
-  * `assert_utc_eob(df, freq="15min")` – verifies tz-aware UTC timestamps on the exact 15-minute grid and no leading/trailing partials.
-  * `assert_monotonic_grid(df)` – confirms strictly increasing `ds` with fixed step.
+  - `assert_utc_eob(df, freq="15min")` – verifies tz-aware UTC timestamps on the exact 15-minute grid and no leading/trailing partials.
+  - `assert_monotonic_grid(df)` – confirms strictly increasing `ds` with fixed step.
     (You’ll create these utilities in §14; this is a binding requirement here.)
 
 ### 0.3 Leakage discipline (non-negotiable)
 
-* **Compute → `shift(1)` rule:** every *historic* derived feature (indicators, MTF aggregates) must be computed on raw OHLCV, aligned to EOB, **then shifted by one bar** before merging into the NF frame. If a feature cannot be shifted (e.g., minute-of-day), it belongs in `futr_exog_list` (future-known) or `stat_exog_list` (static). NF **explicitly distinguishes** `hist_exog_list`, `futr_exog_list`, `stat_exog_list`; misuse causes leakage and invalid evaluation.
-* **No target forward-fill ever:** missing `y` rows are dropped from train windows; do not impute `y`. (Impute *exogs* only when they’re truly stateful and historical; calendar `futr_exog` must be complete by construction.)
+- **Compute → `shift(1)` rule:** every *historic* derived feature (indicators, MTF aggregates) must be computed on raw OHLCV, aligned to EOB, **then shifted by one bar** before merging into the NF frame. If a feature cannot be shifted (e.g., minute-of-day), it belongs in `futr_exog_list` (future-known) or `stat_exog_list` (static). NF **explicitly distinguishes** `hist_exog_list`, `futr_exog_list`, `stat_exog_list`; misuse causes leakage and invalid evaluation.
+- **No target forward-fill ever:** missing `y` rows are dropped from train windows; do not impute `y`. (Impute *exogs* only when they’re truly stateful and historical; calendar `futr_exog` must be complete by construction.)
 
 **Deliverables to add:**
 
-* In **features/postprocess** (later §11), implement one central call:
+- In **features/postprocess** (later §11), implement one central call:
 
-  * `postprocess_shift_and_prune(df_exog, shift=1)` — applies the one-bar shift to all `hist_exog` columns, leaves `futr_exog`/`stat_exog` untouched, and asserts no zero-lag overlap.
+  - `postprocess_shift_and_prune(df_exog, shift=1)` — applies the one-bar shift to all `hist_exog` columns, leaves `futr_exog`/`stat_exog` untouched, and asserts no zero-lag overlap.
 
 ### 0.4 Cross-validation semantics (so you don’t reinvent it later)
 
-* Use NF’s `cross_validation`:
+- Use NF’s `cross_validation`:
 
-  * **Windowing defaults** per `h`: `n_windows=6` (pilot; promote to 10 for final), `step_size=h` (non-overlapping horizons), `val_size=4*h`, `refit=True`. NF applies windows from the series **tail**, trains strictly on the past of each cutoff, and predicts the next `h`. Long `input_size` naturally acts as an embargo between windows.
-* Use `predict_insample(step_size=h)` after `fit` for PIT/coverage diagnostics on train/val without building a custom backtester.
+  - **Windowing defaults** per `h`: `n_windows=6` (pilot; promote to 10 for final), `step_size=h` (non-overlapping horizons), `val_size=4*h`, `refit=True`. NF applies windows from the series **tail**, trains strictly on the past of each cutoff, and predicts the next `h`. Long `input_size` naturally acts as an embargo between windows.
+- Use `predict_insample(step_size=h)` after `fit` for PIT/coverage diagnostics on train/val without building a custom backtester.
 
 **Deliverables to add:**
 
-* In your **experiments/\<h>.yaml** templates (later §9), set:
+- In your **experiments/\<h>.yaml** templates (later §9), set:
 
   ```yaml
   n_windows: 6      # 10 for final
@@ -217,44 +216,44 @@
 
 ### 0.5 Probabilistic forecasts, calibration targets, and metrics
 
-* **Primary evaluation metric:** **sCRPS** (Scaled Continuous Ranked Probability Score). NF ships **`sCRPS`** for probabilistic evaluation and it aligns with quantile or distributional training. Use it as the selection metric; it rewards calibrated, sharp distributions.
+- **Primary evaluation metric:** **sCRPS** (Scaled Continuous Ranked Probability Score). NF ships **`sCRPS`** for probabilistic evaluation and it aligns with quantile or distributional training. Use it as the selection metric; it rewards calibrated, sharp distributions.
 
-* **Training losses (selection protocol):**
+- **Training losses (selection protocol):**
 
-  * Start with **DistributionLoss('StudentT')** for robustness to heavy tails—common in intraday returns. NF provides distributional training and examples modeling the target with **Student’s t**.
-  * Train a parallel **MQLoss**/**ISQF/IQLoss** variant for direct quantile estimation; pick by mean sCRPS and coverage stability on CV.
+  - Start with **DistributionLoss('StudentT')** for robustness to heavy tails—common in intraday returns. NF provides distributional training and examples modeling the target with **Student’s t**.
+- Train a parallel **MQLoss**/**IQLoss** variant for direct quantile estimation; pick by mean sCRPS and coverage stability on CV.
 
-* **Prediction intervals (80/90/95):**
+- **Prediction intervals (80/90/95):**
 
-  * If training with a **point** or distributional loss and calibration is off, use NF’s **Conformal Prediction** wrapper (`PredictionIntervals` via `fit(..., prediction_intervals=...)`) and request levels at `predict(level=[80,90,95])`. No custom code.
-  * Target empirical coverage within **±2%** on held-out test tail; if under-coverage persists, prefer conformal adjustment over ad-hoc hacks.
+  - If training with a **point** or distributional loss and calibration is off, use NF’s **Conformal Prediction** wrapper (`PredictionIntervals` via `fit(..., prediction_intervals=...)`) and request levels at `predict(level=[80,90,95])`. No custom code.
+  - Target empirical coverage within **±2%** on held-out test tail; if under-coverage persists, prefer conformal adjustment over ad-hoc hacks.
 
-* **Diagnostics to compute every run:**
+- **Diagnostics to compute every run:**
 
-  * **Coverage** at 80/90/95 on validation windows and the test tail.
-  * **PIT** histograms via `predict_insample(level=[...])` when using distributional training (PIT \~ Uniform if calibrated). (NF documents insample intervals; produce PIT from the returned CDF/quantiles as applicable.)
+  - **Coverage** at 80/90/95 on validation windows and the test tail.
+  - **PIT** histograms via `predict_insample(level=[...])` when using distributional training (PIT \~ Uniform if calibrated). (NF documents insample intervals; produce PIT from the returned CDF/quantiles as applicable.)
 
 **Deliverables to add:**
 
-* In **uq/diag.py** (later §14), stub the following:
+- In **uq/diag.py** (later §14), stub the following:
 
-  * `compute_coverage(df_preds, levels=[80,90,95]) -> pd.DataFrame`
-  * `plot_pit(insample_df) -> Path`
-  * `coverage_by_vol_decile(df_preds, df_ref_vol)` — to detect heteroscedastic failures.
-* In **run_train.py** (later §9.2), after `fit`:
+  - `compute_coverage(df_preds, levels=[80,90,95]) -> pd.DataFrame`
+  - `plot_pit(insample_df) -> Path`
+  - `coverage_by_vol_decile(df_preds, df_ref_vol)` — to detect heteroscedastic failures.
+- In **run_train.py** (later §9.2), after `fit`:
 
-  * call `predict_insample(...)`, compute PIT & coverage, persist under `reports/<h>/`.
+  - call `predict_insample(...)`, compute PIT & coverage, persist under `reports/<h>/`.
 
 ### 0.6 Scaling/normalization policy (NF-native only)
 
-* **Temporal window normalization (`scaler_type`)** is handled **inside each model**. Set:
+- **Temporal window normalization (`scaler_type`)** is handled **inside each model**. Set:
 
-  * default `scaler_type="robust"`; trial `scaler_type="revin"` on PatchTST/NHITS if CV shows stability lift under drift. NF documents temporal normalization (`scaler_type`) vs. core time series scaling (`local_scaler_type`) and recommends temporal normalization in most applications. We rely on **model-level** scalers—no external scalers.
-* **Do not** implement custom scalers; use NF’s supported list (`robust`, `robust-iqr`, `revin`, etc.) per docs.
+  - default `scaler_type="robust"`; trial `scaler_type="revin"` on PatchTST/NHITS if CV shows stability lift under drift. NF documents temporal normalization (`scaler_type`) vs. core time series scaling (`local_scaler_type`) and recommends temporal normalization in most applications. We rely on **model-level** scalers—no external scalers.
+- **Do not** implement custom scalers; use NF’s supported list (`robust`, `robust-iqr`, `revin`, etc.) per docs.
 
 **Deliverables to add:**
 
-* In **experiments/\<h>.yaml** defaults:
+- In **experiments/\<h>.yaml** defaults:
 
   ```yaml
   scaler_type:
@@ -265,13 +264,13 @@
 
 ### 0.7 Determinism and hygiene
 
-* **Deterministic seeds** at the NF/model level for reproducibility.
-* **Missing bars:** reindex to a full 15-minute UTC grid; see §2 for contract. Never forward-fill `y`. (NF’s data requirements: `["unique_id","ds","y", <exog>]` long format.)
-* **Outliers:** winsorize returns at `[0.1%, 99.9%]` *for training only*; never mutate the reporting layer.
+- **Deterministic seeds** at the NF/model level for reproducibility.
+- **Missing bars:** reindex to a full 15-minute UTC grid; see §2 for contract. Never forward-fill `y`. (NF’s data requirements: `["unique_id","ds","y", <exog>]` long format.)
+- **Outliers:** winsorize returns at `[0.1%, 99.9%]` *for training only*; never mutate the reporting layer.
 
 **Deliverables to add:**
 
-* In **settings.yaml**, add:
+- In **settings.yaml**, add:
 
   ```yaml
   seed: 1337
@@ -291,7 +290,6 @@
 
 ## 1) Repository layout (lean, explicit)
 
-
 ### 1.1 Directory scaffold (one-shot)
 
 Create exactly these paths and sentinel files. Keep names stable; downstream scripts assume them.
@@ -306,9 +304,9 @@ touch run_train.py run_predict.py settings.yaml
 
 **Rules**
 
-* **No new top-level dirs** beyond what’s listed.
-* Keep **snake_case** for files; **PascalCase** only for class names.
-* Paths are relative to repo root in all code.
+- **No new top-level dirs** beyond what’s listed.
+- Keep **snake_case** for files; **PascalCase** only for class names.
+- Paths are relative to repo root in all code.
 
 ### 1.2 File inventory & responsibilities (don’t deviate)
 
@@ -331,31 +329,31 @@ Use this as the **source of truth** for what each module owns. LOC budgets are u
 
 **Hard bans**
 
-* No custom backtester—**only** `NeuralForecast.cross_validation` & `predict_insample`. 
-* No custom model persistence—**only** `nf.save()` / `NeuralForecast.load()`. 
+- No custom backtester—**only** `NeuralForecast.cross_validation` & `predict_insample`.
+- No custom model persistence—**only** `nf.save()` / `NeuralForecast.load()`.
 
 ### 1.3 Naming & artifact conventions (uniform, predictable)
 
-* **Experiments:**
+- **Experiments:**
 
-  * Directory per horizon: `experiments/h{h}/` (e.g., `experiments/h16/`).
-  * Files:
+  - Directory per horizon: `experiments/h{h}/` (e.g., `experiments/h16/`).
+  - Files:
 
-    * CV predictions: `experiments/h{h}/cv_results.parquet`
-    * CV metrics: `experiments/h{h}/metrics.csv`
-    * Model save dir (best candidate): `experiments/h{h}/best/` → written via `nf.save(path, overwrite=True, save_dataset=True)`; later restored with `NeuralForecast.load(path)`. 
-* **Reports:**
+    - CV predictions: `experiments/h{h}/cv_results.parquet`
+    - CV metrics: `experiments/h{h}/metrics.csv`
+    - Model save dir (best candidate): `experiments/h{h}/best/` → written via `nf.save(path, overwrite=True, save_dataset=True)`; later restored with `NeuralForecast.load(path)`.
+- **Reports:**
 
-  * `reports/h{h}/pit_hist.png`, `reports/h{h}/coverage_table.csv`, `reports/h{h}/vol_decile_coverage.csv`, `reports/h{h}/forecast_plot.png`, `reports/h{h}/preds_latest.parquet`.
-* **Models:** Model names in outputs must match config `name` (e.g., `NHITS-StudentT`). Don’t bake hyperparams into filenames; they live in YAML and saved model metadata.
+  - `reports/h{h}/pit_hist.png`, `reports/h{h}/coverage_table.csv`, `reports/h{h}/vol_decile_coverage.csv`, `reports/h{h}/forecast_plot.png`, `reports/h{h}/preds_latest.parquet`.
+- **Models:** Model names in outputs must match config `name` (e.g., `NHITS-StudentT`). Don’t bake hyperparams into filenames; they live in YAML and saved model metadata.
 
 ### 1.4 Coding standards (tight and boring)
 
-* **Imports:** `from neuralforecast import NeuralForecast`; models via `from neuralforecast.models import NHITS, NBEATSx, TiDE, PatchTST`. Losses via `from neuralforecast.losses.pytorch import DistributionLoss, MQLoss, ISQF, IQLoss`. 
-* **Model interfaces:** wire `h`, `input_size`, `scaler_type`, `loss`, and exog lists (`hist_exog_list`, `futr_exog_list`, `stat_exog_list`) from config. (Exog hooks are per-model in NF, incl. NBEATSx/NHITS.) 
-* **CV:** always call `nf.cross_validation(df=..., n_windows=..., step_size=..., refit=True, val_size=...)`. Store the returned long DF with columns `[unique_id, ds, cutoff, <ModelName...>, y]`. 
-* **Insample diagnostics:** after `fit`, call `nf.predict_insample(step_size=h, level=[80,90,95])` for PIT and coverage scaffolding. 
-* **Persistence:** save with `nf.save(path, save_dataset=True, overwrite=True)`; load with `NeuralForecast.load(path)`. Do not pickle manually. 
+- **Imports:** `from neuralforecast import NeuralForecast`; models via `from neuralforecast.models import NHITS, NBEATSx, TiDE, PatchTST`. Losses via `from neuralforecast.losses.pytorch import DistributionLoss, MQLoss, IQLoss`.
+- **Model interfaces:** wire `h`, `input_size`, `scaler_type`, `loss`, and exog lists (`hist_exog_list`, `futr_exog_list`, `stat_exog_list`) from config. (Exog hooks are per-model in NF, incl. NBEATSx/NHITS.)
+- **CV:** always call `nf.cross_validation(df=..., n_windows=..., step_size=..., refit=True, val_size=...)`. Store the returned long DF with columns `[unique_id, ds, cutoff, <ModelName...>, y]`.
+- **Insample diagnostics:** after `fit`, call `nf.predict_insample(step_size=h, level=[80,90,95])` for PIT and coverage scaffolding when using distributional/quantile models. Note: conformal-wrapped runs do not provide insample PIs.
+- **Persistence:** save with `nf.save(path, save_dataset=True, overwrite=True)`; load with `NeuralForecast.load(path)`. Do not pickle manually.
 
 ### 1.5 Bootstrap stubs (drop-in file skeletons)
 
@@ -422,7 +420,7 @@ def timestamped_path(base_dir: str, stem: str, ext: str = "parquet") -> str:
 ```python
 from typing import List
 from neuralforecast.models import NHITS, NBEATSx, TiDE, PatchTST
-from neuralforecast.losses.pytorch import DistributionLoss, MQLoss, ISQF, IQLoss
+from neuralforecast.losses.pytorch import DistributionLoss, MQLoss, IQLoss
 
 def _make_loss(spec: dict):
     kind = spec.get("loss", "StudentT")
@@ -430,8 +428,6 @@ def _make_loss(spec: dict):
         return DistributionLoss(distribution="StudentT")
     if kind == "MQLoss":
         return MQLoss(level=spec.get("level", [10,50,90]))
-    if kind == "ISQF":
-        return ISQF(level=spec.get("level", [10,50,90]))
     if kind == "IQLoss":
         return IQLoss(level=spec.get("level", [10,50,90]))
     raise ValueError(f"Unknown loss: {kind}")
@@ -579,9 +575,9 @@ save_parquet(pred, timestamped_path(f"reports/h{cfg['h']}", "preds"))
 
 **Why this layout works (and is safe):**
 
-* It **hard-codes NF primitives** (models, losses, scalers via `scaler_type`, cross-val, `predict_insample`, `save/load`) instead of rolling your own. 
-* Exogenous integration is enforced at the **factory** layer with `hist_exog_list`, `futr_exog_list`, `stat_exog_list` (documented in NF model pages such as NBEATSx/NHITS). 
-* No bespoke “framework”; each module tops out at \~100–300 LOC, which keeps complexity in check.
+- It **hard-codes NF primitives** (models, losses, scalers via `scaler_type`, cross-val, `predict_insample`, `save/load`) instead of rolling your own.
+- Exogenous integration is enforced at the **factory** layer with `hist_exog_list`, `futr_exog_list`, `stat_exog_list` (documented in NF model pages such as NBEATSx/NHITS).
+- No bespoke “framework”; each module tops out at \~100–300 LOC, which keeps complexity in check.
 
 ---
 
@@ -591,13 +587,13 @@ save_parquet(pred, timestamped_path(f"reports/h{cfg['h']}", "preds"))
 
 Use a **long-format** DataFrame that NF expects, with columns: \["unique_id", "ds", "y", ...\]. In our case:
 
-* **unique_id:** BTC-USD for this single series (string or category).
+- **unique_id:** BTC-USD for this single series (string or category).
 
-* **ds:** datetime64\[ns\] in UTC, marking the end of each 15-min interval.
+- **ds:** datetime64\[ns\] in UTC, marking the end of each 15-min interval.
 
-* **y:** the target we want to forecast. **We choose log-returns** (log of close price relative to previous close) as the modeling target. This makes the series more stationary (de-trending price) and helps many models focus on fluctuations rather than absolute scale. If end users need price forecasts, we can always exponentiate the cumulative forecasts of returns to get price levels.
+- **y:** the target we want to forecast. **We choose log-returns** (log of close price relative to previous close) as the modeling target. This makes the series more stationary (de-trending price) and helps many models focus on fluctuations rather than absolute scale. If end users need price forecasts, we can always exponentiate the cumulative forecasts of returns to get price levels.
 
-* (Potential additional columns for exogenous features as needed, see §3).
+- (Potential additional columns for exogenous features as needed, see §3).
 
 The dataset should cover a continuous timeline with no gaps in ds. We’ll parse the Kaggle “Bitcoin Historical Data” (assumed pre-loaded) into this schema, verifying we have a complete 15-min grid from start to end.
 
@@ -607,13 +603,13 @@ The dataset should cover a continuous timeline with no gaps in ds. We’ll parse
 
 Because crypto trades 24/7, we expect no regularly scheduled gaps (like weekends) – any gap is likely missing data that should be treated carefully:
 
-* **Missing intervals:** If any 15-min bar is missing, insert it with y as NaN (since we can’t forward-fill returns or prices reliably). During training, NF will ignore those NaNs (by mask) or we drop them from the modeling DataFrame. Exogenous features for those intervals can be forward-filled if they are slow-moving (e.g., daily calendar features), but technical indicators should also be NaN for truly missing input data.
+- **Missing intervals:** If any 15-min bar is missing, insert it with y as NaN (since we can’t forward-fill returns or prices reliably). During training, NF will ignore those NaNs (by mask) or we drop them from the modeling DataFrame. Exogenous features for those intervals can be forward-filled if they are slow-moving (e.g., daily calendar features), but technical indicators should also be NaN for truly missing input data.
 
-* **Outliers:** Extreme outlier returns (e.g., exchange glitches) can be winsorized to the 0.1%/99.9% range to prevent distortion of scale-sensitive models. This clipping is only on training data y (we will monitor if it improves stability). Actual y values remain unmodified for evaluation.
+- **Outliers:** Extreme outlier returns (e.g., exchange glitches) can be winsorized to the 0.1%/99.9% range to prevent distortion of scale-sensitive models. This clipping is only on training data y (we will monitor if it improves stability). Actual y values remain unmodified for evaluation.
 
-* **Scaling:** We rely on NF’s internal scalers for model inputs (see scaler_type in §4). We do **not** pre-standardize y globally, because NF will handle scaling per window/series as configured.
+- **Scaling:** We rely on NF’s internal scalers for model inputs (see scaler_type in §4). We do **not** pre-standardize y globally, because NF will handle scaling per window/series as configured.
 
-* **Deterministic splits:** We avoid any shuffling. Instead, we’ll use time-based splits for backtesting and holdout (see §5). Random seeds are set for reproducibility (e.g., PyTorch lightning under the hood, and any hyperparameter search procedures).
+- **Deterministic splits:** We avoid any shuffling. Instead, we’ll use time-based splits for backtesting and holdout (see §5). Random seeds are set for reproducibility (e.g., PyTorch lightning under the hood, and any hyperparameter search procedures).
 
 After preparing the DataFrame, add rigorous validation checks in utils/validate.py, for example:
 
@@ -627,8 +623,6 @@ to ensure no timestamp irregularities.
 Our training procedure uses expanding windows (time series cross-validation). We do *not* pre-partition a static train/val/test in the usual sense, but for clarity: - **Model training windows:** Will span from the beginning of data up to certain cutoff points, as determined by cross-validation (see §5). - **Validation** (for early stopping and hyperparameters): In NF, we specify val_size \= 4*h within each training window, so the last part of each training window is used for on-the-fly validation to trigger early stopping. - **Final evaluation (test):** After model selection, we will evaluate on the last n days (e.g., last 60–90 days not seen in any training window) to ensure performance holds on recent data. This can be done via an explicit test_size in NF’s cross-validation or by a separate call to predict on the tail portion.
 
 All procedures respect time order: the model never trains on data from the future relative to the evaluation period.
-
-
 
 ### 2.4 Canonical NF frame (schema, target, coercions)
 
@@ -676,20 +670,20 @@ def make_nf_canonical(df_ohlcv_15m: pd.DataFrame, unique_id: str = "BTC-USD") ->
 
 **Validation hooks (will be called by §1 stubs):**
 
-* `assert_regular_grid(df,"15min")` and `assert_utc_eob(df,"15min")` (already stubbed in §1.5).
-* Add **missing bar** checks *before* modeling (see 2.2).
-* Enforce `unique_id` present even for a single series (NF expects it). Docs reiterate unique_id is required and can be string/int/category .
+- `assert_regular_grid(df,"15min")` and `assert_utc_eob(df,"15min")` (already stubbed in §1.5).
+- Add **missing bar** checks *before* modeling (see 2.2).
+- Enforce `unique_id` present even for a single series (NF expects it). Docs reiterate unique_id is required and can be string/int/category .
 
 ### 2.5 Regularization policy (missing bars, NaNs, winsorization)
 
 **Missing bars:**
 
-* Create a **complete** 15-min UTC grid from min to max `ds`. Keep `y` as `NaN` where price is missing; **never** forward-fill `y`. NF consumes long-format frames; you may **drop NaN `y` rows** from each training window (NF masks invalid parts) but keep them in the master frame so your grid stays consistent .
-* For **exogenous** features: forward-fill is acceptable **only** for *historic stateful* features (e.g., prior computed MTF indicator values) *after* shifting (see §3 and §4). Calendar `futr_exog` must be complete by construction.
+- Create a **complete** 15-min UTC grid from min to max `ds`. Keep `y` as `NaN` where price is missing; **never** forward-fill `y`. NF consumes long-format frames; you may **drop NaN `y` rows** from each training window (NF masks invalid parts) but keep them in the master frame so your grid stays consistent .
+- For **exogenous** features: forward-fill is acceptable **only** for *historic stateful* features (e.g., prior computed MTF indicator values) *after* shifting (see §3 and §4). Calendar `futr_exog` must be complete by construction.
 
 **Winsorization (training only):**
 
-* Clip `y` at `[0.1%, 99.9%]` quantiles on the **training subset** to avoid pathological spikes driving loss instability. Do **not** alter `y` in evaluation or reporting. Keep the original `y_raw` if you want to audit.
+- Clip `y` at `[0.1%, 99.9%]` quantiles on the **training subset** to avoid pathological spikes driving loss instability. Do **not** alter `y` in evaluation or reporting. Keep the original `y_raw` if you want to audit.
 
 **Drop-in: append to `utils/io.py`**
 
@@ -779,11 +773,11 @@ assert_no_forward_fill_y(nf_base)
 
 ### 2.9 Why this is correct (and safe)
 
-* **NF schema compliance:** matches Nixtla’s required long format (`unique_id, ds, y`) for `NeuralForecast` input; exogenous variables are simply **extra columns** on this long frame (and are referenced by name via `hist_exog_list`, `futr_exog_list`, `stat_exog_list`) .
-* **Grid regularization:** ensures **no ragged edges** or silent gaps; NF cross-validation expects time-ordered frames—gaps can silently skew horizons if not normalized.
-* **Target hygiene:** no forward-fill of `y`, winsorization only for training stability, not for evaluation.
-* **Leakage control:** central `shift(1)` enforcement + `assert_shifted` post-merge means you will catch 99% of accidental future-look.
-* **UTC EOB discipline:** prevents off-by-one bar errors when you add MTF features (we’ll use freqtrade’s `resample_to_interval`/`resampled_merge` later; they’re designed to build higher-TF features and merge down precisely).
+- **NF schema compliance:** matches Nixtla’s required long format (`unique_id, ds, y`) for `NeuralForecast` input; exogenous variables are simply **extra columns** on this long frame (and are referenced by name via `hist_exog_list`, `futr_exog_list`, `stat_exog_list`) .
+- **Grid regularization:** ensures **no ragged edges** or silent gaps; NF cross-validation expects time-ordered frames—gaps can silently skew horizons if not normalized.
+- **Target hygiene:** no forward-fill of `y`, winsorization only for training stability, not for evaluation.
+- **Leakage control:** central `shift(1)` enforcement + `assert_shifted` post-merge means you will catch 99% of accidental future-look.
+- **UTC EOB discipline:** prevents off-by-one bar errors when you add MTF features (we’ll use freqtrade’s `resample_to_interval`/`resampled_merge` later; they’re designed to build higher-TF features and merge down precisely).
 
 ---
 
@@ -799,23 +793,23 @@ We categorize exogenous features by how they align with the target: - **Historic
 
 We will implement a **feature registry** in code to define and parameterize these. Some initial examples:
 
-* *Trend/Momentum:* rsi(period=14), stoch_k%/d% (14,3), roc(window=16) for rate-of-change, moving averages (e.g., ma_fast=20, ma_slow=100 to generate golden-cross signals), MACD (with standard fast=12, slow=26, signal=9).
+- *Trend/Momentum:* rsi(period=14), stoch_k%/d% (14,3), roc(window=16) for rate-of-change, moving averages (e.g., ma_fast=20, ma_slow=100 to generate golden-cross signals), MACD (with standard fast=12, slow=26, signal=9).
 
-* *Volatility:* true range and ATR (atr(14)), rolling volatility of returns (e.g., std dev over 8, 32, 96-bar windows), Bollinger Band width (as percentage of price).
+- *Volatility:* true range and ATR (atr(14)), rolling volatility of returns (e.g., std dev over 8, 32, 96-bar windows), Bollinger Band width (as percentage of price).
 
-* *Volume & Order-flow:* volume moving averages, volume RSI, Chaikin Money Flow (cmf), Money Flow Index (mfi), on-balance volume, etc. Also volume imbalance or buy/sell volume if available (depending on dataset).
+- *Volume & Order-flow:* volume moving averages, volume RSI, Chaikin Money Flow (cmf), Money Flow Index (mfi), on-balance volume, etc. Also volume imbalance or buy/sell volume if available (depending on dataset).
 
-* *Price structure:* Bollinger Bands (we can use TA-Lib via vectorbt to get upper/lower bands; we might include just the percent-b deviation of price or band width as features), Donchian channels (e.g., 20-bar high/low to indicate recent range), and perhaps patterns like if close is highest in N bars.
+- *Price structure:* Bollinger Bands (we can use TA-Lib via vectorbt to get upper/lower bands; we might include just the percent-b deviation of price or band width as features), Donchian channels (e.g., 20-bar high/low to indicate recent range), and perhaps patterns like if close is highest in N bars.
 
-* *Cross-asset or external:* (If allowed by data) maybe an external indicator like S\&P500 futures or USD index, but since not specified, we’ll assume only BTC data for now.
+- *Cross-asset or external:* (If allowed by data) maybe an external indicator like S\&P500 futures or USD index, but since not specified, we’ll assume only BTC data for now.
 
 We will generate each indicator at the 15-min level *and* on higher aggregates: - **Multi-timeframe (MTF) features:** 30-min, 1-hour, and 4-hour frequencies. For each such timeframe, we’ll resample the OHLCV to that interval (aligned to the end of the bar) and compute a similar set of indicators. Then we bring them into the 15-min frame. For example, a 1-hour RSI or a 4-hour moving average can be very informative for the trend context. Using resample_to_interval (from freqtrade.technical.util) and resampled_merge, we can do this systematically. The merged columns will be named like resample_60_close, etc., which we’ll then suffix with the indicator name. **We must forward-fill** the higher timeframe values down to 15-min within each hour. By aligning to end-of-bar, a 1H indicator at 10:00 covers data through 09:00–10:00 and will be applied to the 10:00 timestamp row, then forward-filled for sub-intervals until 10:00. Finally, we shift everything by 1 base interval to avoid contemporaneous leaks.
 
 Example: to get a 4-hour ATR into 15-min frame, compute ATR on 4H resampled candles, merge into base frame with fill, resulting in a column (say atr_4h) that is constant for each 4h block of rows and updates at the end of each 4h window. After shifting by 1 (15 min), at time 12:00 the model can use the ATR that was computed on data up to 11:59 (covering 8:00-12:00 block if 4h ATR).
 
-* **Future-known (Calendar) features:** Crypto trades continuously, but we can still derive features like day_of_week (0=Monday,...6=Sunday) – perhaps weekends behave differently (lower volumes or different volatility regimes) even though trading is open. We’ll include binary flags like is_weekend and possibly holiday indicators (for major holidays that might affect trading behavior, though crypto is global and holiday impact is less direct). Other calendar features: minute of day or hour of day as a cyclical feature (we can encode via sin/cos or as categorical). These are **future exogenous** because we know the calendar in advance for any future timestamp. They will be passed in futr_exog_list and do **not** need shifting (NF knows they are available for future times).
+- **Future-known (Calendar) features:** Crypto trades continuously, but we can still derive features like day_of_week (0=Monday,...6=Sunday) – perhaps weekends behave differently (lower volumes or different volatility regimes) even though trading is open. We’ll include binary flags like is_weekend and possibly holiday indicators (for major holidays that might affect trading behavior, though crypto is global and holiday impact is less direct). Other calendar features: minute of day or hour of day as a cyclical feature (we can encode via sin/cos or as categorical). These are **future exogenous** because we know the calendar in advance for any future timestamp. They will be passed in futr_exog_list and do **not** need shifting (NF knows they are available for future times).
 
-* **Static features:** The only static feature for now is something trivial like asset_id. For a single series, it’s constant, so it won’t add information; but to keep the design general, we include it (e.g., asset_id \= 1 for BTC or one-hot encoded as \["asset_BTC"\]). If we expand to multiple assets, this becomes useful (one model can handle multiple series with static identifiers). Static features go via stat_exog_list.
+- **Static features:** The only static feature for now is something trivial like asset_id. For a single series, it’s constant, so it won’t add information; but to keep the design general, we include it (e.g., asset_id \= 1 for BTC or one-hot encoded as \["asset_BTC"\]). If we expand to multiple assets, this becomes useful (one model can handle multiple series with static identifiers). Static features go via stat_exog_list.
 
 After assembling all candidate features, we will **prune aggressively** to avoid overfitting and ensure the model training remains efficient: - Drop any feature column that is more than \~2% NaN over the history *after* shifting (features with too many missing values are unreliable). - Drop features that are nearly constant or have extremely low variance. - Check pairwise correlations (Spearman rank) among features and remove highly collinear ones (e.g., if two momentum indicators at slightly different windows correlate 0.99, keep one). - Optionally, compute mutual information or simple feature importance by training a quick decision tree on a rolling window and remove obviously useless features. But given deep models can do feature selection implicitly, we focus on removing redundant features and keeping total count manageable (target: no more than 100-200 features after one-hot expansions, which is well within NF’s capability).
 
@@ -825,15 +819,14 @@ Perfect — expanding the **next unit only**. Paste the block below **directly u
 
 ---
 
-
-> Paste this entire block under **“## 3) Exogenous variables (exo-gen) strategy”**. It expands your section into a production-ready indicator registry, multi-timeframe (MTF) pipeline, strict `shift(1)` hygiene, and pruning. All implementations stay inside **NF’s exog lists**: `hist_exog_list`, `futr_exog_list`, `stat_exog_list` (documented on NF model pages and exogenous-vars guide). 
+> Paste this entire block under **“## 3) Exogenous variables (exo-gen) strategy”**. It expands your section into a production-ready indicator registry, multi-timeframe (MTF) pipeline, strict `shift(1)` hygiene, and pruning. All implementations stay inside **NF’s exog lists**: `hist_exog_list`, `futr_exog_list`, `stat_exog_list` (documented on NF model pages and exogenous-vars guide).
 
 ### 3.1 Indicator registry (vectorbt + TA-Lib primary; pandas-ta-openbb supplement)
 
 **Why this stack (brief):**
 
-* **vectorbt** wraps TA-Lib & Pandas-TA with an indicator engine that **broadcasts parametrized grids** and **handles DataFrames natively**; `IndicatorFactory.from_talib()` auto-wires inputs/params/outputs, enabling **cartesian product parameter sweeps** (fast, vectorized).
-* **pandas-ta-openbb** is **Numba-accelerated** pure-Python TA with 130+ indicators; use it to fill gaps or when TA-Lib lacks a variant.
+- **vectorbt** wraps TA-Lib & Pandas-TA with an indicator engine that **broadcasts parametrized grids** and **handles DataFrames natively**; `IndicatorFactory.from_talib()` auto-wires inputs/params/outputs, enabling **cartesian product parameter sweeps** (fast, vectorized).
+- **pandas-ta-openbb** is **Numba-accelerated** pure-Python TA with 130+ indicators; use it to fill gaps or when TA-Lib lacks a variant.
 
 **Drop-in file:** `features/registry.py`
 Create a **declarative registry** describing what to compute, parameter grids, kind (`hist|futr|stat`), and timeframe (`15min|30min|1h|4h`). Keep it **small** first; expand only if sCRPS drops materially.
@@ -909,8 +902,8 @@ MTF_TARGETS: List[Tuple[TF, List[str]]] = [
 
 **Notes:**
 
-* vectorbt’s **TA-Lib wrappers** accept param arrays and broadcast **cartesian combos** across columns **fast**, ideal for grid-friendly indicators.
-* Use **pandas-ta-openbb** only when TA-Lib lacks a needed variant (e.g., Donchian). It’s **Numba-accelerated** and works directly on Series/DataFrames.
+- vectorbt’s **TA-Lib wrappers** accept param arrays and broadcast **cartesian combos** across columns **fast**, ideal for grid-friendly indicators.
+- Use **pandas-ta-openbb** only when TA-Lib lacks a needed variant (e.g., Donchian). It’s **Numba-accelerated** and works directly on Series/DataFrames.
 
 ### 3.2 Feature builder (compute → align → `shift(1)`)
 
@@ -1146,10 +1139,10 @@ def select_features(exo: pd.DataFrame, policy: Dict) -> Tuple[List[str], List[st
 
 **Rationale:**
 
-* **Correlation pruning** removes redundant signals (|ρ|≥0.95).
-* **Cap 256** prevents memory bloat and overfitting risk in deep models.
-* Favor **future-known** calendars (cheap, useful) and stat (rare).
-* Let **NF scalers** handle scaling; don’t pre-standardize features (NF `scaler_type` is native). 
+- **Correlation pruning** removes redundant signals (|ρ|≥0.95).
+- **Cap 256** prevents memory bloat and overfitting risk in deep models.
+- Favor **future-known** calendars (cheap, useful) and stat (rare).
+- Let **NF scalers** handle scaling; don’t pre-standardize features (NF `scaler_type` is native).
 
 ### 3.4 End-to-end assembly (how Section 3 plugs into Section 2 & 9)
 
@@ -1191,11 +1184,11 @@ NF’s **exogenous interface** is standardized across models and documented (and
 
 ### 3.6 Hygiene & boundary cases you must enforce
 
-* **Always `shift(1)`** after MTF merge: the higher-TF bar closing at `10:00` must **not** be used for the **10:00** prediction; it becomes available for **10:15**. Your centralized `postprocess_shift_and_prune` already enforces this.
-* **EOB correctness:** If provider timestamps are slightly off, `regularize_to_grid_utc()` (Section 2) snaps to the **15m EOB grid** to avoid misalignment with MTF joins.
-* **NaN warmup:** Drop rows where indicators are warming up (first `max_lag` bars); your availability filter (≥98%) plus NF masking will handle residuals.
-* **Multi-output indicators:** For BBANDS we kept only **bandwidth** (signal density). If you later need %B or z-scores, add as **separate post steps** to avoid feature bloat.
-* **Parameter grids:** vectorbt **broadcasts** arrays (e.g., RSI periods \[7,14,28]) to columns efficiently; don’t loop Python-side unless you must (you don’t).
+- **Always `shift(1)`** after MTF merge: the higher-TF bar closing at `10:00` must **not** be used for the **10:00** prediction; it becomes available for **10:15**. Your centralized `postprocess_shift_and_prune` already enforces this.
+- **EOB correctness:** If provider timestamps are slightly off, `regularize_to_grid_utc()` (Section 2) snaps to the **15m EOB grid** to avoid misalignment with MTF joins.
+- **NaN warmup:** Drop rows where indicators are warming up (first `max_lag` bars); your availability filter (≥98%) plus NF masking will handle residuals.
+- **Multi-output indicators:** For BBANDS we kept only **bandwidth** (signal density). If you later need %B or z-scores, add as **separate post steps** to avoid feature bloat.
+- **Parameter grids:** vectorbt **broadcasts** arrays (e.g., RSI periods \[7,14,28]) to columns efficiently; don’t loop Python-side unless you must (you don’t).
 
 ### 3.7 Minimal tests (fast, not fluffy)
 
@@ -1212,35 +1205,35 @@ Add these to a quick smoke notebook or unit tests:
 
 We will leverage four of NF’s state-of-the-art architectures, each with a strong track record on time-series and complementary inductive biases:
 
-* **NHITS:** N-HiTS (Neural Hierarchical Interpolation for Time Series) – excels at multiscale patterns and long horizons via hierarchical interpolation. Good for capturing seasonalities and trends with its multi-resolution blocks.
+- **NHITS:** N-HiTS (Neural Hierarchical Interpolation for Time Series) – excels at multiscale patterns and long horizons via hierarchical interpolation. Good for capturing seasonalities and trends with its multi-resolution blocks.
 
-* **NBEATSx:** An extension of N-BEATS that supports exogenous variables. NBEATSx has interpretable trend/seasonality blocks plus generic blocks, and it can explicitly attribute forecast components. It’s a solid all-rounder and by design handles our exog lists.
+- **NBEATSx:** An extension of N-BEATS that supports exogenous variables. NBEATSx has interpretable trend/seasonality blocks plus generic blocks, and it can explicitly attribute forecast components. It’s a solid all-rounder and by design handles our exog lists.
 
-* **TiDE:** Temporal fusion network inspired model (Transformer or MLP-mixer like) specialized for time-series (recent addition by Nixtla). It’s a simpler encoder-decoder that treats the window as a “tabular” input and forecast as regression, handling exogenous inputs well.
+- **TiDE:** Temporal fusion network inspired model (Transformer or MLP-mixer like) specialized for time-series (recent addition by Nixtla). It’s a simpler encoder-decoder that treats the window as a “tabular” input and forecast as regression, handling exogenous inputs well.
 
-* **PatchTST:** A patching Time Series Transformer – effectively a Transformer that splits the time axis into patches (like vision transformers do for images). This model shines in capturing long-range dependencies and seasonality without needing explicit multi-scale blocks. It can utilize very long input sizes (2048+) and the revin scaler (RevIN normalization) can help it handle non-stationarity.
+- **PatchTST:** A patching Time Series Transformer – effectively a Transformer that splits the time axis into patches (like vision transformers do for images). This model shines in capturing long-range dependencies and seasonality without needing explicit multi-scale blocks. It can utilize very long input sizes (2048+) and the revin scaler (RevIN normalization) can help it handle non-stationarity.
 
 ### 4.0 Portfolio justification (BTC intraday, 15-min)
 
-**Models kept**: **NHITS**, **NBEATSx**, **TiDE**, **PatchTST** — all accept exogenous lists via `hist_exog_list`, `futr_exog_list`, `stat_exog_list` and expose training/runtime knobs we need (losses, scalers, early-stop, batch sizes). See model signatures in Nixtla docs: **NHITS** and **NBEATSx** list the three exog lists and `scaler_type` among constructor args, plus training knobs like `max_steps`, `learning_rate`, `early_stop_patience_steps`, `batch_size`, etc.  **TiDE** exposes the same lists and `scaler_type` too.  **PatchTST** similarly accepts all three exog lists; it **also** has a **model-level `revin` switch** (besides the generic temporal scaler). 
+**Models kept**: **NHITS**, **NBEATSx**, **TiDE**, **PatchTST** — all accept exogenous lists via `hist_exog_list`, `futr_exog_list`, `stat_exog_list` and expose training/runtime knobs we need (losses, scalers, early-stop, batch sizes). See model signatures in Nixtla docs: **NHITS** and **NBEATSx** list the three exog lists and `scaler_type` among constructor args, plus training knobs like `max_steps`, `learning_rate`, `early_stop_patience_steps`, `batch_size`, etc.  **TiDE** exposes the same lists and `scaler_type` too.  **PatchTST** similarly accepts all three exog lists; it **also** has a **model-level `revin` switch** (besides the generic temporal scaler).
 
 **Why these four:**
 
-* **PatchTST** handles **long contexts** efficiently; includes native **RevIN** flag and works well on non-stationary intraday crypto. 
-* **NHITS** is strong/efficient on multi-scale patterns — performs well on long horizons, and integrates exogs cleanly. 
-* **NBEATSx** adds explicit exogenous projections with interpretable blocks; a good complement to NHITS. 
-* **TiDE** (dense encoder/decoder) is a solid tabular-style baseline that often benefits from crafted exogs. 
+- **PatchTST** handles **long contexts** efficiently; includes native **RevIN** flag and works well on non-stationary intraday crypto.
+- **NHITS** is strong/efficient on multi-scale patterns — performs well on long horizons, and integrates exogs cleanly.
+- **NBEATSx** adds explicit exogenous projections with interpretable blocks; a good complement to NHITS.
+- **TiDE** (dense encoder/decoder) is a solid tabular-style baseline that often benefits from crafted exogs.
 
 **Loss options we will use (NF-native):**
 
-* **Distributional** via `DistributionLoss(...)` — we’ll use **"StudentT"** for heavy-tailed intraday returns; NF’s DistributionLoss is the right API hook. 
-* **Quantile** via **`MQLoss`** (or **`IQLoss`/ISQF** if we see quantile crossing). NF’s loss collection covers MQLoss/IQLoss and gives us **sCRPS** for evaluation. 
+- **Distributional** via `DistributionLoss(...)` — we’ll use **"StudentT"** for heavy-tailed intraday returns; NF’s DistributionLoss is the right API hook.
+- **Quantile** via **`MQLoss`** (or **`IQLoss`/ISQF** if we see quantile crossing). NF’s loss collection covers MQLoss/IQLoss and gives us **sCRPS** for evaluation.
 
-**Scaling/normalization (NF TemporalNorm):** `scaler_type` supports `identity`, `standard`, **`robust`**, **`invariant`**, **`revin`**, etc. We default to **`robust`** (median/MAD), trial **`revin`** on PatchTST/NHITS; RevIN is documented in NF’s TemporalNorm. 
+**Scaling/normalization (NF TemporalNorm):** `scaler_type` supports `identity`, `standard`, **`robust`**, **`invariant`**, **`revin`**, etc. We default to **`robust`** (median/MAD), trial **`revin`** on PatchTST/NHITS; RevIN is documented in NF’s TemporalNorm.
 
-**Probabilistic outputs & intervals:** NF predicts quantiles/parametric distributions and **exposes conformal intervals** through `PredictionIntervals` + `predict(level=[...])`. Column naming for intervals follows `Model-lo-90`/`Model-hi-90`, etc. 
+**Probabilistic outputs & intervals:** NF predicts quantiles/parametric distributions and **exposes conformal intervals** through `PredictionIntervals` (passed to `fit`/`cross_validation`) and requesting levels at `predict(level=[...])`. Column naming for intervals follows `Model-lo-90`/`Model-hi-90`, etc.
 
-**Persistence & API surface:** Use **`NeuralForecast.fit`**, **`predict`**, **`predict_insample`**, **`cross_validation`** and **`save`/`load`** exactly as provided; no custom backtester or serialization. 
+**Persistence & API surface:** Use **`NeuralForecast.fit`**, **`predict`**, **`predict_insample`**, **`cross_validation`** and **`save`/`load`** exactly as provided; no custom backtester or serialization.
 
 We will train these models in parallel through NF’s interface (passing a list of model instances to NeuralForecast). Each model will output forecasts for each horizon we configure. Key hyperparameters and reasoning:
 
@@ -1248,35 +1241,35 @@ We will train these models in parallel through NF’s interface (passing a list 
 
 We establish some common defaults for all models, which we can later override per model if needed:
 
-* **h:** Forecast horizon (will be set to 4, 8, 16, or 32 depending on the experiment run).
+- **h:** Forecast horizon (will be set to 4, 8, 16, or 32 depending on the experiment run).
 
-* **input_size:** Length of historical input window. Default 1024, except PatchTST which we set to 2048 by default (since Transformers benefit from more context).
+- **input_size:** Length of historical input window. Default 1024, except PatchTST which we set to 2048 by default (since Transformers benefit from more context).
 
-* **scaler_type:** "robust" by default for all. This means NF will internally scale each time series segment by subtracting median and dividing by median absolute deviation, which is resilient to outliers. For PatchTST (and possibly NHITS) we will also try "revin" – a reversible instance normalization that learns affine transformations to adjust normalization, which can help with distribution shifts in crypto (RevIN essentially normalizes each window then adds learned bias/scale back, mitigating train-test distribution differences).
+- **scaler_type:** "robust" by default for all. This means NF will internally scale each time series segment by subtracting median and dividing by median absolute deviation, which is resilient to outliers. For PatchTST (and possibly NHITS) we will also try "revin" – a reversible instance normalization that learns affine transformations to adjust normalization, which can help with distribution shifts in crypto (RevIN essentially normalizes each window then adds learned bias/scale back, mitigating train-test distribution differences).
 
-* **loss:** We will configure both **Distributional** and **Quantile** losses for different runs of the same model:
+- **loss:** We will configure both **Distributional** and **Quantile** losses for different runs of the same model:
 
-* *Distributional:* DistributionLoss(distribution='StudentT'), which makes the model output parameters of a Student-T distribution and trains via likelihood (heavy-tail Student-T is good for financial returns). This approach gives us a full distribution and we can directly derive intervals of any level from it.
+- *Distributional:* DistributionLoss(distribution='StudentT'), which makes the model output parameters of a Student-T distribution and trains via likelihood (heavy-tail Student-T is good for financial returns). This approach gives us a full distribution and we can directly derive intervals of any level from it.
 
-* *Quantile:* MQLoss(level=\[10, 20, 50, 80, 90\]) or similar (we’ll include a symmetric set of quantiles). Multi-Quantile Loss trains the model to output specific quantile forecasts (pinball loss for each quantile). With a dense set of quantiles, MQLoss approximates the Continuous Ranked Probability Score (CRPS), which aligns with our goal of minimizing sCRPS. If we use MQLoss, NF will directly output those quantiles (and ensure non-crossing if using the ISQF variant).
+- *Quantile:* MQLoss(level=\[10, 20, 50, 80, 90\]) or similar (we’ll include a symmetric set of quantiles). Multi-Quantile Loss trains the model to output specific quantile forecasts (pinball loss for each quantile). With a dense set of quantiles, MQLoss approximates the Continuous Ranked Probability Score (CRPS), which aligns with our goal of minimizing sCRPS. If we use MQLoss, NF will directly output those quantiles (and ensure non-crossing if using the ISQF variant).
 
-* **learning_rate:** Start with 1e-3 for all. NF uses PyTorch Lightning with Adam optimizer by default. We may adjust per model if we observe slow convergence or instability (PatchTST might tolerate 5e-4 if 1e-3 is too high for the transformer).
+- **learning_rate:** Start with 1e-3 for all. NF uses PyTorch Lightning with Adam optimizer by default. We may adjust per model if we observe slow convergence or instability (PatchTST might tolerate 5e-4 if 1e-3 is too high for the transformer).
 
-* **batch_size:** Start with 512\. This is the number of series (or windows) in each training batch. Since we have only one series but NF will use window sampling, effectively it means 512 windows per batch. If we run out of memory (especially with PatchTST on GPU), we can lower this to 256\. If underutilizing GPU, we could try 1024 for smaller models.
+- **batch_size:** Start with 512\. This is the number of series (or windows) in each training batch. Since we have only one series but NF will use window sampling, effectively it means 512 windows per batch. If we run out of memory (especially with PatchTST on GPU), we can lower this to 256\. If underutilizing GPU, we could try 1024 for smaller models.
 
-* **max_epochs / steps:** We prefer to specify max_steps instead of epochs because with sampled windows, steps are more stable. For now, set max_steps \= 20_000 which is an upper bound – with early stopping we likely won’t reach this. We use early_stop_patience_steps \= 400 (meaning if validation loss doesn’t improve for 400 steps, stop training) to prevent overfitting. These are fairly conservative given intraday data can have noise – we don’t want to over-train.
+- **max_epochs / steps:** We prefer to specify max_steps instead of epochs because with sampled windows, steps are more stable. For now, set max_steps \= 20_000 which is an upper bound – with early stopping we likely won’t reach this. We use early_stop_patience_steps \= 400 (meaning if validation loss doesn’t improve for 400 steps, stop training) to prevent overfitting. These are fairly conservative given intraday data can have noise – we don’t want to over-train.
 
-* **Early stopping and checkpoints:** By default NF doesn’t save intermediate checkpoints (to save disk) and we’re not doing multiple restarts, so early stopping will just keep the best weights in memory. We ensure to monitor the appropriate validation loss (which NF does automatically).
+- **Early stopping and checkpoints:** By default NF doesn’t save intermediate checkpoints (to save disk) and we’re not doing multiple restarts, so early stopping will just keep the best weights in memory. We ensure to monitor the appropriate validation loss (which NF does automatically).
 
-* **Random seed:** Fix a seed (e.g., 1337) for initialization to make results reproducible. NF’s models will respect this for weight init and any internal sampling.
+- **Random seed:** Fix a seed (e.g., 1337) for initialization to make results reproducible. NF’s models will respect this for weight init and any internal sampling.
 
-* **Exogenous inputs:** We will pass our feature column lists:
+- **Exogenous inputs:** We will pass our feature column lists:
 
-* hist_exog_list \= \[...\] for all the technical indicator columns (already shifted and safe). NF will lag them behind y internally as well, but since we shift, we double ensure safety.
+- hist_exog_list \= \[...\] for all the technical indicator columns (already shifted and safe). NF will lag them behind y internally as well, but since we shift, we double ensure safety.
 
-* futr_exog_list \= \["minute_of_day", "day_of_week", "is_weekend", ...\] calendar features (they are known for future timestamps).
+- futr_exog_list \= \["minute_of_day", "day_of_week", "is_weekend", ...\] calendar features (they are known for future timestamps).
 
-* stat_exog_list \= \["asset_id"\] (or an empty list if we decide it’s not adding value). These hooks allow models like NBEATSx, TFT, etc., to incorporate exogenous variables properly at forecast time.
+- stat_exog_list \= \["asset_id"\] (or an empty list if we decide it’s not adding value). These hooks allow models like NBEATSx, TFT, etc., to incorporate exogenous variables properly at forecast time.
 
 We encapsulate these in a model factory. For example, a snippet (illustrative):
 
@@ -1291,9 +1284,9 @@ def make_models(h, hist_cols, futr_cols, stat_cols):
                   max_steps=20000, early_stop_patience_steps=400)  
     return \[  
        NHITS(loss=DistributionLoss(distribution='StudentT'), **common),  
-       NHITS(loss=MQLoss(level=\[10,50,90\]), **common),  
+       NHITS(loss=MQLoss(level=\[10,50,90\]),**common),  
        NBEATSx(loss=DistributionLoss(distribution='StudentT'), **common),  
-       NBEATSx(loss=MQLoss(level=\[10,50,90\]), **common),  
+       NBEATSx(loss=MQLoss(level=\[10,50,90\]),**common),  
        TiDE(loss=MQLoss(level=\[10,50,90\]), **common),  
        PatchTST(loss=DistributionLoss(distribution='StudentT'),  
                **{**common, 'input_size': 2048, 'scaler_type': 'revin'})  \# PatchTST with RevIN scaler  
@@ -1324,29 +1317,28 @@ def make_models(h, hist_cols, futr_cols, stat_cols):
 
 **Loss protocol (operational):**
 
-* **Start** with **StudentT** (distributional) and a **parallel** MQLoss run for the same model/horizon.
-* **Select** by **mean sCRPS** across CV windows (primary) + empirical coverage/pit sanity. NF exposes **sCRPS** as a metric/loss util; use it in evaluation code. 
-* If you observe **quantile crossing** under MQLoss, re-run using **IQLoss/ISQF** (NF provides IQLoss) or keep MQLoss and fix via **conformal** in §9/§10. 
+- **Start** with **StudentT** (distributional) and a **parallel** MQLoss run for the same model/horizon.
+- **Select** by **mean sCRPS** across CV windows (primary) + empirical coverage/pit sanity. NF exposes **sCRPS** as a metric/loss util; use it in evaluation code.
+- If you observe **quantile crossing** under MQLoss, re-run using **IQLoss/ISQF** (NF provides IQLoss) or keep MQLoss and fix via **conformal** in §9/§10.
 
 **Scaling protocol:**
 
-* Default **`scaler_type="robust"`**. Trial **`invariant`** if volatility regimes are extreme (arcsinh-robust). **RevIN**:
+- Default **`scaler_type="robust"`**. Trial **`invariant`** if volatility regimes are extreme (arcsinh-robust). **RevIN**:
 
-  * Use **`revin=True`** on **PatchTST** first (model-level flag).
-  * For others, set **`scaler_type="revin"`** if initial live monitoring shows scale drift hurting coverage; TemporalNorm supports `'revin'`. 
-
+  - Use **`revin=True`** on **PatchTST** first (model-level flag).
+  - For others, set **`scaler_type="revin"`** if initial live monitoring shows scale drift hurting coverage; TemporalNorm supports `'revin'`.
 
 ### 4.2 Model-specific configurations
 
 We will start with relatively simple configurations for each model, avoiding overfitting through excessive complexity:
 
-* **NHITS:** Use 2 or 3 stacks with default settings. We will keep n_blocks small (2) and use the default multi-scale pooling (NF’s default for NHITS is usually 3 stacks with downsample factors \[1,2,3\] or similar). For initial runs, we won’t heavily customize the block architecture – just rely on default and possibly adjust dropout_prob_theta (e.g. 0.1) to regularize.
+- **NHITS:** Use 2 or 3 stacks with default settings. We will keep n_blocks small (2) and use the default multi-scale pooling (NF’s default for NHITS is usually 3 stacks with downsample factors \[1,2,3\] or similar). For initial runs, we won’t heavily customize the block architecture – just rely on default and possibly adjust dropout_prob_theta (e.g. 0.1) to regularize.
 
-* **NBEATSx:** Use the interpretable configuration (trend, seasonality, exogenous basis) or generic? Given intraday data has daily seasonality, we might use one trend and one seasonality basis. NF’s default NBEATSx uses stack_types=\['identity','trend','seasonality'\] by default. We’ll start with that default which gives 3 stacks: one identity (for idiosyncratic), one trend (polynomials), one seasonality (Fourier). We’ll set n_blocks modest (e.g., \[1,1,1\]) and mlp_units=\[ \[512,512\], \[512,512\], \[512,512\] \] as default. We can try a slightly larger MLP if needed. Dropout not typically used in NBEATSx except maybe on exogenous projection, but we can set dropout_prob_theta=0.1 if we see overfit.
+- **NBEATSx:** Use the interpretable configuration (trend, seasonality, exogenous basis) or generic? Given intraday data has daily seasonality, we might use one trend and one seasonality basis. NF’s default NBEATSx uses stack_types=\['identity','trend','seasonality'\] by default. We’ll start with that default which gives 3 stacks: one identity (for idiosyncratic), one trend (polynomials), one seasonality (Fourier). We’ll set n_blocks modest (e.g., \[1,1,1\]) and mlp_units=\[ \[512,512\], \[512,512\], \[512,512\] \] as default. We can try a slightly larger MLP if needed. Dropout not typically used in NBEATSx except maybe on exogenous projection, but we can set dropout_prob_theta=0.1 if we see overfit.
 
-* **TiDE:** It’s a newer model; we’ll use default hidden size (maybe 256 or 512) and a couple of layers. Ensure it ingests exogenous correctly (should via hist_exog and futr_exog). We might set dropout=0.1 for regularization.
+- **TiDE:** It’s a newer model; we’ll use default hidden size (maybe 256 or 512) and a couple of layers. Ensure it ingests exogenous correctly (should via hist_exog and futr_exog). We might set dropout=0.1 for regularization.
 
-* **PatchTST:** We give it the longest input (2048). Set patch length 16, stride 8 or 16 (these hyperparams control how it segment the series). Use n_heads=8 and model dimension \~128-256. We also enable revin=True which NF supports (scaler_type 'revin') because transformers can benefit from instance normalization to handle non-stationary scale. PatchTST can be memory-heavy; we will monitor GPU memory (reduce batch or d_model if needed).
+- **PatchTST:** We give it the longest input (2048). Set patch length 16, stride 8 or 16 (these hyperparams control how it segment the series). Use n_heads=8 and model dimension \~128-256. We also enable revin=True which NF supports (scaler_type 'revin') because transformers can benefit from instance normalization to handle non-stationary scale. PatchTST can be memory-heavy; we will monitor GPU memory (reduce batch or d_model if needed).
 
 All models use loss=DistributionLoss('StudentT') or loss=MQLoss(...) as described. NF takes care of computing the corresponding metrics (like likelihood or pinball losses) during training.
 
@@ -1457,9 +1449,9 @@ def instantiate_models(cfg: Dict[str, Any],
     return out
 ```
 
-* **Why this is safe:** We pass exog lists and scalers **exactly** per NF API; all four models accept `hist_exog_list`, `futr_exog_list`, `stat_exog_list`, and `scaler_type`. **PatchTST** additionally supports `revin` if you add it in YAML — it will be forwarded transparently here. 
-* **Losses:** We select **`DistributionLoss("StudentT")`** or **`MQLoss` / `IQLoss`** by a tiny YAML spec; all are NF-native. **sCRPS** is available later for evaluation. 
-* **No over-engineering:** There’s no training wrapper; you still use **`NeuralForecast(models=[...], freq=...)`** and NF’s **`fit` / `cross_validation` / `predict`**. ([nixtla.github.io][9])
+- **Why this is safe:** We pass exog lists and scalers **exactly** per NF API; all four models accept `hist_exog_list`, `futr_exog_list`, `stat_exog_list`, and `scaler_type`. **PatchTST** additionally supports `revin` if you add it in YAML — it will be forwarded transparently here.
+- **Losses:** We select **`DistributionLoss("StudentT")`** or **`MQLoss` / `IQLoss`** by a tiny YAML spec; all are NF-native. **sCRPS** is available later for evaluation.
+- **No over-engineering:** There’s no training wrapper; you still use **`NeuralForecast(models=[...], freq=...)`** and NF’s **`fit` / `cross_validation` / `predict`**. ([nixtla.github.io][9])
 
 #### 4.2.B Minimal YAML snippets (per horizon)
 
@@ -1537,8 +1529,8 @@ models:
       max_steps: 20000
 ```
 
-* **All keys map 1:1 to NF ctor args** on these model pages, including `n_blocks`, `dropout_prob_theta` (NBEATSx/NHITS), PatchTST’s `patch_len`, `stride`, `n_heads`, and `revin`. 
-* We enable early stopping via `early_stop_patience_steps`; NF defaults are often `-1` (disabled), so we’re explicit. 
+- **All keys map 1:1 to NF ctor args** on these model pages, including `n_blocks`, `dropout_prob_theta` (NBEATSx/NHITS), PatchTST’s `patch_len`, `stride`, `n_heads`, and `revin`.
+- We enable early stopping via `early_stop_patience_steps`; NF defaults are often `-1` (disabled), so we’re explicit.
 
 #### 4.2.C Usage in training scripts (kept minimal, NF-native)
 
@@ -1559,14 +1551,14 @@ nf = NeuralForecast(models=models, freq=cfg["freq"])  # NF core class
 # Fit, predict_insample for PIT, and cross_validation are NF built-ins
 ```
 
-* `NeuralForecast` is the orchestrator; it natively handles **`fit`**, **`predict`**, **`predict_insample`**, and **`cross_validation`** on our long-format frame. ([nixtla.github.io][9], [Nixtlaverse][8])
+- `NeuralForecast` is the orchestrator; it natively handles **`fit`**, **`predict`**, **`predict_insample`**, and **`cross_validation`** on our long-format frame. ([nixtla.github.io][9], [Nixtlaverse][8])
 
 #### 4.2.D Sanity checks & gotchas (don’t skip)
 
-* **Exog wire-up**: if a column is listed in an exog list that the model **doesn’t** support, NF will raise; these four models support all three list types (doc signatures show them). Keep the lists consistent. 
-* **RevIN vs scaler_type**: For **PatchTST**, you can use **both**: `revin=True` **and** `scaler_type="robust"`; RevIN is an **additional** learnable affine after temporal normalization (see TemporalNorm notes). If you set `scaler_type="revin"` globally, you don’t need PatchTST’s `revin=True`; prefer the documented PatchTST flag for that model and keep others on `"robust"`. 
-* **Probabilistic outputs**: For distributional runs, set prediction levels at inference (`predict(level=[80,90,95])`), and conformal can be enabled via `PredictionIntervals` in `fit` if you want conformal PIs on point-loss models. 
-* **Metrics**: Use **sCRPS** as your **primary** probabilistic score in CV summaries; it’s available in NF’s loss/metrics module. PIT/coverage diagnostics are detailed later; interval columns follow `Model-lo-k`/`Model-hi-k`. 
+- **Exog wire-up**: if a column is listed in an exog list that the model **doesn’t** support, NF will raise; these four models support all three list types (doc signatures show them). Keep the lists consistent.
+- **RevIN vs scaler_type**: For **PatchTST**, you can use **both**: `revin=True` **and** `scaler_type="robust"`; RevIN is an **additional** learnable affine after temporal normalization (see TemporalNorm notes). If you set `scaler_type="revin"` globally, you don’t need PatchTST’s `revin=True`; prefer the documented PatchTST flag for that model and keep others on `"robust"`.
+- **Probabilistic outputs**: For distributional runs, set prediction levels at inference (`predict(level=[80,90,95])`), and conformal can be enabled via `PredictionIntervals` in `fit` if you want conformal PIs on point-loss models.
+- **Metrics**: Use **sCRPS** as your **primary** probabilistic score in CV summaries; it’s available in NF’s loss/metrics module. PIT/coverage diagnostics are detailed later; interval columns follow `Model-lo-k`/`Model-hi-k`.
 
 ---
 
@@ -1576,15 +1568,15 @@ We rely on NF’s built-in NeuralForecast.cross_validation for model evaluation 
 
 **Plan:** Perform a sliding-origin evaluation with expanding windows, *refitting the model for each window* (to mimic how in practice we would retrain periodically with more data).
 
-* **Number of windows (n_windows):** Start with 6 for initial experiments (covering several recent months depending on horizon length) and later increase to 10 if needed for more robust statistics. Each window corresponds to a training period and an evaluation period following it.
+- **Number of windows (n_windows):** Start with 6 for initial experiments (covering several recent months depending on horizon length) and later increase to 10 if needed for more robust statistics. Each window corresponds to a training period and an evaluation period following it.
 
-* **Window step size (step_size):** Set equal to the horizon *h*. This ensures backtest windows do not overlap in their forecasted periods – effectively a **chained forecast** approach. For example, if h=16 (4 hours), window1 might forecast hours 1-4, window2 forecasts hours 5-8, etc., so we test sequential non-overlapping segments.
+- **Window step size (step_size):** Set equal to the horizon *h*. This ensures backtest windows do not overlap in their forecasted periods – effectively a **chained forecast** approach. For example, if h=16 (4 hours), window1 might forecast hours 1-4, window2 forecasts hours 5-8, etc., so we test sequential non-overlapping segments.
 
-* **Validation size (val_size):** Within each window’s training, we allocate 4*h data points at the end as a validation set (used for early stopping and for picking best model). This is not the same as the cross-val evaluation data; it’s an internal split of the training data. For instance, if h=16, val_size=64 (16 hours) at the end of the training period. We choose 4h as a rule of thumb to ensure the model is checked on a decently sized chunk.
+- **Validation size (val_size):** Within each window’s training, we allocate 4*h data points at the end as a validation set (used for early stopping and for picking best model). This is not the same as the cross-val evaluation data; it’s an internal split of the training data. For instance, if h=16, val_size=64 (16 hours) at the end of the training period. We choose 4h as a rule of thumb to ensure the model is checked on a decently sized chunk.
 
-* **Refit:** True. This means each window will train the model from scratch on that window’s training data. Without refit, NF would train once and just slide the window to predict multiple segments, but in practice we would retrain as new data comes in. Refit=True more faithfully simulates operational forecasts at different points in time.
+- **Refit:** True. This means each window will train the model from scratch on that window’s training data. Without refit, NF would train once and just slide the window to predict multiple segments, but in practice we would retrain as new data comes in. Refit=True more faithfully simulates operational forecasts at different points in time.
 
-* **Overlap:** By using step_size \= h, we avoid overlapping forecasts. If we used smaller step_size (say h/2), NF would produce overlapping forecast segments (some timestamps predicted twice), which complicates metric calculation. Our choice simplifies analysis: each timestamp in the historical data is forecast exactly once in cross-validation.
+- **Overlap:** By using step_size \= h, we avoid overlapping forecasts. If we used smaller step_size (say h/2), NF would produce overlapping forecast segments (some timestamps predicted twice), which complicates metric calculation. Our choice simplifies analysis: each timestamp in the historical data is forecast exactly once in cross-validation.
 
 **Implicit embargo:** Because our input_size (1024+) is large, and we don’t allow overlap, effectively the training data for window2 starts after window1’s forecast period ends. The long history means the model has to wait at least 1024 points before it can predict, ensuring no leakage from a forecasted period back into training of the next period (this acts somewhat like a gap or embargo between folds).
 
@@ -1596,13 +1588,13 @@ NF’s cross_validation returns a DataFrame with columns: unique_id, ds, cutoff,
 
 **Policy (per your plan):** For each `h ∈ {4, 8, 16, 32}` (1h/2h/4h/8h at 15-min base):
 
-* `n_windows`: **6** for pilots → **10** for final runs.
-* `step_size`: **= h** (prevents target overlap across windows).
-* `val_size`: **= 4*h** (stabilizes sCRPS/coverage without bloating compute).
-* `refit`: **1** (i.e., retrain every window; `refit` accepts `bool|int`. Using `1` is explicit and equivalent to `True` in practice). 
-* `level`: set when you want *interval outputs* from CV (e.g., `[80,90,95]`).
-* `quantiles`: alternative to `level` when evaluating **quantile-trained** models.
-* **Why no custom embargo:** NF CV is **strictly time-ordered**; setting long `input_size` creates an *implicit embargo* between training context and validation horizon. `step_size=h` avoids horizon bleed by design. 
+- `n_windows`: **6** for pilots → **10** for final runs.
+- `step_size`: **= h** (prevents target overlap across windows).
+- `val_size`: **= 4*h** (stabilizes sCRPS/coverage without bloating compute).
+- `refit`: **1** (i.e., retrain every window; `refit` accepts `bool|int`. Using `1` is explicit and equivalent to `True` in practice).
+- `level`: set when you want *interval outputs* from CV (e.g., `[80,90,95]`).
+- `quantiles`: alternative to `level` when evaluating **quantile-trained** models.
+- **Why no custom embargo:** NF CV is **strictly time-ordered**; setting long `input_size` creates an *implicit embargo* between training context and validation horizon. `step_size=h` avoids horizon bleed by design.
 
 **Concrete call (template used by the runner below):**
 
@@ -1617,11 +1609,11 @@ cv_df = nf.cross_validation(
 )
 ```
 
-NF’s `cross_validation` doc (Core) defines each of these args and their semantics, including `refit` behavior and the role of `level/quantiles`. 
+NF’s `cross_validation` doc (Core) defines each of these args and their semantics, including `refit` behavior and the role of `level/quantiles`.
 
-**Insample predictions for diagnostics:** after `fit`, call `predict_insample(step_size=1, level=...)` to generate train/val backcasts for PIT/coverage diagnostics. **This is NF-native; do not implement your own loop.** 
+**Insample predictions for diagnostics:** after `fit`, call `predict_insample(step_size=1, level=...)` to generate train/val backcasts for PIT/coverage diagnostics for distributional/quantile models. **Conformal runs do not provide insample PIs.** **This is NF-native; do not implement your own loop.**
 
-**Conformal intervals inside CV (optional):** You may pass `prediction_intervals=PredictionIntervals(...)` to **`fit`**/**`cross_validation`** to evaluate **conformal** coverage during CV; the official tutorial demonstrates `PredictionIntervals` usage with NF. 
+**Conformal intervals inside CV (optional):** You may pass `prediction_intervals=PredictionIntervals(...)` to **`fit`**/**`cross_validation`** to evaluate **conformal** coverage during CV; the official tutorial demonstrates `PredictionIntervals` usage with NF.
 
 ### 5.2 Metrics, outputs, and artifacts (NF-produced → thin glue only)
 
@@ -1629,7 +1621,7 @@ For each model and window, we’ll compute: - **sCRPS:** If a distributional mod
 
 All these metrics will be computed for each window and averaged. We will save the full cross-val results to experiments/\<h\>/results.parquet. This will include every forecast vs actual, which allows flexible metric calculation.
 
-Additionally, we use nf.predict_insample() after fitting on the entire training set (or on each fold) to get in-sample predictions. This yields a DataFrame with model predictions for the training period and validation period, including actual y and a cutoff column marking end of train in each backtest fold. Using this, we can analyze: - **PIT (Probability Integral Transform) histograms:** For distributional models, PIT is computed by substituting actual values into the CDF of forecast distribution for each point. If forecasts are calibrated, PIT values are Uniform(0,1). We can simulate PIT by, say, taking Student-T CDF of each actual, average over all, and plot the distribution. - **Quantile residuals:** For quantile forecasts, check how often actuals are below the 10th percentile forecast, 50th, etc. Ideally about 10%, 50%, etc. This checks calibration.
+Additionally, we use nf.predict_insample() after fitting on the entire training set (or on each fold) to get in-sample predictions. This yields a DataFrame with model predictions for the training period and validation period, including actual y and a cutoff column marking end of train in each backtest fold. Using this, we can analyze: - **PIT (Probability Integral Transform) histograms:** For distributional models, PIT is computed by substituting actual values into the CDF of forecast distribution for each point. If forecasts are calibrated, PIT values are Uniform(0,1). For conformalized runs, insample PIs are not produced; rely on CV/test coverage checks instead. - **Quantile residuals:** For quantile forecasts, check how often actuals are below the 10th percentile forecast, 50th, etc. Ideally about 10%, 50%, etc. This checks calibration.
 
 The cross-validation and insample analysis together tell us how well each model is doing and whether uncertainty estimates are reliable.
 
@@ -1639,19 +1631,19 @@ We do **not** write a backtester. We **do** compute **summary tables** and **cal
 
 #### 5.2.A What NF returns (you will aggregate, not recompute)
 
-* `cross_validation(...)` → a long DataFrame with per-model predictions across windows (includes columns for point, and if `level`/`quantiles` are set, interval/quantile columns such as `Model-lo-90` / `Model-hi-90`). 
-* `predict_insample(...)` → per-model insample predictions for train/val tails; same rules for `level`/`quantiles`. Useful for PIT/coverage sanity. 
+- `cross_validation(...)` → a long DataFrame with per-model predictions across windows (includes columns for point, and if `level`/`quantiles` are set, interval/quantile columns such as `Model-lo-90` / `Model-hi-90`).
+- `predict_insample(...)` → per-model insample predictions for train/val tails; same rules for `level`/`quantiles`. Useful for PIT/coverage sanity.
 
 #### 5.2.B Primary metric: **sCRPS** (with MAE/RMSE as supporting)
 
-NF exposes **sCRPS** in its **losses/metrics** module; use it as the **primary** probabilistic score (lower is better). We also compute MAE/RMSE on the mean prediction. 
+NF exposes **sCRPS** in its **losses/metrics** module; use it as the **primary** probabilistic score (lower is better). We also compute MAE/RMSE on the mean prediction.
 
-> sCRPS is a proper scoring rule for **quantile** or **distributional** forecasts and is endorsed in NF’s documentation. (Section *Probabilistic Errors → sCRPS*.) 
+> sCRPS is a proper scoring rule for **quantile** or **distributional** forecasts and is endorsed in NF’s documentation. (Section *Probabilistic Errors → sCRPS*.)
 
 #### 5.2.C Coverage & PIT diagnostics
 
-* **Coverage**: empirical hit-rate of `y` inside `lo/hi` for **80/90/95**.
-* **PIT**: For **quantile** outputs, approximate PIT as the **interpolated quantile rank** of `y` among predicted quantiles; for **distributional** outputs, request dense `level` grid (e.g., 1–99) and use the same rank-based PIT approximation (good enough for diagnostics). PIT should be \~uniform; deviations indicate miscalibration.
+- **Coverage**: empirical hit-rate of `y` inside `lo/hi` for **80/90/95**.
+- **PIT**: For **quantile** outputs, approximate PIT as the **interpolated quantile rank** of `y` among predicted quantiles; for **distributional** outputs, request dense `level` grid (e.g., 1–99) and use the same rank-based PIT approximation (good enough for diagnostics). PIT should be \~uniform; deviations indicate miscalibration. For **conformal** runs, do not expect insample PIs; evaluate calibration via CV/test coverage statistics.
 
 ---
 
@@ -1723,8 +1715,8 @@ def summarize_cv(cv_df: pd.DataFrame, y_col: str="y") -> pd.DataFrame:
 ```
 
 > **Notes:**
-> • The leaderboard leaves `sCRPS` as `NaN` unless you **also produce quantiles** (set dense `quantiles` or levels when calling CV) or compute sCRPS via the NF loss utilities on predicted quantiles. The NF docs expose **sCRPS** in the losses module; if you request a grid of quantiles (e.g., `quantiles=[i/100 for i in range(1,100)]`) you can compute sCRPS precisely. Keep it pragmatic: for routine CV, use `levels=[80,90,95]` for coverage; run **full sCRPS** on promoted configs only. 
-> • Interval columns follow NF’s `Model-lo-k` / `Model-hi-k` naming (from the **Core** examples). 
+> • The leaderboard leaves `sCRPS` as `NaN` unless you **also produce quantiles** (set dense `quantiles` or levels when calling CV) or compute sCRPS via the NF loss utilities on predicted quantiles. The NF docs expose **sCRPS** in the losses module; if you request a grid of quantiles (e.g., `quantiles=[i/100 for i in range(1,100)]`) you can compute sCRPS precisely. Keep it pragmatic: for routine CV, use `levels=[80,90,95]` for coverage; run **full sCRPS** on promoted configs only.
+> • Interval columns follow NF’s `Model-lo-k` / `Model-hi-k` naming (from the **Core** examples).
 
 #### 5.2.E PIT helper (diagnostic only; run on promoted configs)
 
@@ -1794,22 +1786,22 @@ leaderboard.to_parquet(f"experiments/h{cfg['h']}/leaderboard.parquet")
 
 #### 5.2.G Leakage discipline (assertions you **must** keep)
 
-* **No contemporaneous exogs:** You already enforced **compute → `shift(1)`** for all **hist** exogs (Section 3). Keep the unit test.
-* **Window purity:** `step_size=h` ensures forecasts from different cutoffs do not **share** target indices; `refit=1` ensures each window trains only on strictly earlier data. **This is NF-guaranteed temporal ordering; don’t build embargo logic yourself.** 
-* **Validation span:** `val_size=4*h` gives enough samples to estimate sCRPS/coverage per-window without leaking future information.
-* **Insample use:** `predict_insample` predicts on train/val portions from the **stored dataset** and respects masks/indexing; use it for diagnostics only. 
+- **No contemporaneous exogs:** You already enforced **compute → `shift(1)`** for all **hist** exogs (Section 3). Keep the unit test.
+- **Window purity:** `step_size=h` ensures forecasts from different cutoffs do not **share** target indices; `refit=1` ensures each window trains only on strictly earlier data. **This is NF-guaranteed temporal ordering; don’t build embargo logic yourself.**
+- **Validation span:** `val_size=4*h` gives enough samples to estimate sCRPS/coverage per-window without leaking future information.
+- **Insample use:** `predict_insample` predicts on train/val portions from the **stored dataset** and respects masks/indexing; use it for diagnostics only.
 
 ---
 
 #### 5.2.H When to attach **Conformal** (keep it minimal)
 
-* If quantile/distributional runs **miss coverage** by more than ±2% on CV/test tails, attach **conformal** via NF’s `PredictionIntervals` (either in `fit` or `cross_validation`) and re-evaluate coverage at **80/90/95**. NF’s tutorial shows end-to-end usage with `PredictionIntervals`. **Do not** hack losses to “fix” coverage. 
+- If quantile/distributional runs **miss coverage** by more than ±2% on CV/test tails, attach **conformal** via NF’s `PredictionIntervals` (either in `fit` or `cross_validation`) and re-evaluate coverage at **80/90/95**. NF’s tutorial shows end-to-end usage with `PredictionIntervals`. **Do not** hack losses to “fix” coverage.
 
 ---
 
 #### 5.2.I Save/Load (for reproducibility & later inference)
 
-* After selecting winners (or top-2 ensemble per §8), **save** using `nf.save(path, save_dataset=True)`; **load** with `NeuralForecast.load(path)` inside `run_predict.py`. These are **NF-native**; don’t roll your own serialization. 
+- After selecting winners (or top-2 ensemble per §8), **save** using `nf.save(path, save_dataset=True)`; **load** with `NeuralForecast.load(path)` inside `run_predict.py`. These are **NF-native**; don’t roll your own serialization.
 
 ---
 
@@ -1819,49 +1811,49 @@ We will avoid massive hyperparameter grids. Instead, use informed small-scale se
 
 Proposed search spaces (to be executed via optuna or manual grid):
 
-* **NHITS:**
+- **NHITS:**
 
-* n_blocks: 2 or 3 (stacks) – more might overfit intraday noise.
+- n_blocks: 2 or 3 (stacks) – more might overfit intraday noise.
 
-* dropout_prob_theta: {0.0, 0.1, 0.2} – test some regularization.
+- dropout_prob_theta: {0.0, 0.1, 0.2} – test some regularization.
 
-* Possibly different downsampling factors (but we can stick to default \[1,2,3\] initially).
+- Possibly different downsampling factors (but we can stick to default \[1,2,3\] initially).
 
-* **NBEATSx:**
+- **NBEATSx:**
 
-* n_blocks: {1, 2} for each stack type (trend, seasonal, identity).
+- n_blocks: {1, 2} for each stack type (trend, seasonal, identity).
 
-* mlp_units: e.g., try slightly larger like \[ \[512,512\], \[256,256\], \[256,256\] \] vs default \[512,512\] for all.
+- mlp_units: e.g., try slightly larger like \[ \[512,512\], \[256,256\], \[256,256\] \] vs default \[512,512\] for all.
 
-* dropout_prob_theta: {0.0, 0.1} (NBEATSx has internal dropout possibly on exogenous basis).
+- dropout_prob_theta: {0.0, 0.1} (NBEATSx has internal dropout possibly on exogenous basis).
 
-* **TiDE:**
+- **TiDE:**
 
-* hidden_size: {256, 512}.
+- hidden_size: {256, 512}.
 
-* num_layers: {2, 3}.
+- num_layers: {2, 3}.
 
-* dropout: {0.0, 0.1, 0.2}.
+- dropout: {0.0, 0.1, 0.2}.
 
-* **PatchTST:**
+- **PatchTST:**
 
-* d_model (hidden size): {128, 256} – balancing accuracy vs memory.
+- d_model (hidden size): {128, 256} – balancing accuracy vs memory.
 
-* n_heads: {4, 8}.
+- n_heads: {4, 8}.
 
-* patch_len: {16, 32}.
+- patch_len: {16, 32}.
 
-* stride: same as patch_len or half of it (to allow overlapping patches).
+- stride: same as patch_len or half of it (to allow overlapping patches).
 
-* revin: {True, False} – but likely True is beneficial for non-stationary crypto, per literature.
+- revin: {True, False} – but likely True is beneficial for non-stationary crypto, per literature.
 
-* **Global knobs:**
+- **Global knobs:**
 
-* learning_rate: {1e-3, 5e-4}.
+- learning_rate: {1e-3, 5e-4}.
 
-* batch_size: {256, 512} (if memory is an issue) – larger batch can stabilize training but diminishing returns.
+- batch_size: {256, 512} (if memory is an issue) – larger batch can stabilize training but diminishing returns.
 
-* input_size: we already have a rationale, but we might test 512 vs 1024 for smaller models to see if shorter history suffices.
+- input_size: we already have a rationale, but we might test 512 vs 1024 for smaller models to see if shorter history suffices.
 
 **Search approach:** - Use NF’s integration with Optuna (if available) or manual experiments. NF does have an AutoMLP and similar, but we prefer control. - **Pilot on one horizon (h=16):** Do a limited search on h=16 which is a mid-range horizon, with 3-fold CV for quick feedback. Identify which model families and param combos look promising (e.g., maybe PatchTST with certain settings shines, or NBEATSx with dropout). - **Select top configurations:** Pick, say, the best 2 configurations per model type. - Expand those to a full 6-fold CV on all four horizons (4,8,16,32) to see consistency. It’s possible one config is best for short horizons and another for long; we might then keep both as separate “models” when ensembling. - We intentionally keep the hyperparam ranges tight (like 2-3 options each) to avoid combinatorial explosion. With 4 models, if each has \~3 options, that’s manageable.
 
@@ -1898,7 +1890,7 @@ Use **small, hand-curated sets** that map 1:1 to NF ctor args. No external HPO u
 | `batch_size`         | {512}                           |
 | `max_steps`          | 20_000 (guarded by early stop) |
 
-All names come from the NHITS signature (includes `n_blocks`, `n_pool_kernel_size`, `dropout_prob_theta`, `learning_rate`, `batch_size`, early-stopping args, and `scaler_type`). 
+All names come from the NHITS signature (includes `n_blocks`, `n_pool_kernel_size`, `dropout_prob_theta`, `learning_rate`, `batch_size`, early-stopping args, and `scaler_type`).
 
 #### NBEATSx (NF: `models.nbeatsx`)
 
@@ -1912,7 +1904,7 @@ All names come from the NHITS signature (includes `n_blocks`, `n_pool_kernel_siz
 | `batch_size`         | {512}                              |
 | `max_steps`          | 20_000                            |
 
-Parameter names and semantics per NBEATSx doc (includes `n_blocks`, `mlp_units`, `dropout_prob_theta`, etc.). 
+Parameter names and semantics per NBEATSx doc (includes `n_blocks`, `mlp_units`, `dropout_prob_theta`, etc.).
 
 #### TiDE (NF: `models.tide`)
 
@@ -1927,7 +1919,7 @@ Parameter names and semantics per NBEATSx doc (includes `n_blocks`, `mlp_units`,
 | `batch_size`         | {512}           |
 | `max_steps`          | 20_000         |
 
-TiDE page shows `hidden_size`, `{num_encoder_layers,num_decoder_layers}`, `dropout`, and the standard training knobs. 
+TiDE page shows `hidden_size`, `{num_encoder_layers,num_decoder_layers}`, `dropout`, and the standard training knobs.
 
 #### PatchTST (NF: `models.patchtst`)
 
@@ -1944,11 +1936,11 @@ TiDE page shows `hidden_size`, `{num_encoder_layers,num_decoder_layers}`, `dropo
 | `batch_size`     | {256, 512}      |
 | `max_steps`      | 10_000–20_000 |
 
-All names in the PatchTST signature (includes `patch_len`, `stride`, `n_heads`, `hidden_size`, `encoder_layers`, `revin`, learning/early-stop/batch/scaling args). We bias to slightly **lower LR** on PatchTST. 
+All names in the PatchTST signature (includes `patch_len`, `stride`, `n_heads`, `hidden_size`, `encoder_layers`, `revin`, learning/early-stop/batch/scaling args). We bias to slightly **lower LR** on PatchTST.
 
-> **Scaling**: Keep `scaler_type="robust"` globally; try `revin=True` on PatchTST and, only if materially helpful, switch select others to `scaler_type="revin"`. Supported scaler names are documented in NF’s TemporalNorm. 
+> **Scaling**: Keep `scaler_type="robust"` globally; try `revin=True` on PatchTST and, only if materially helpful, switch select others to `scaler_type="revin"`. Supported scaler names are documented in NF’s TemporalNorm.
 
-> **Loss selection**: Use **StudentT** (distributional) and **MQLoss/IQLoss** (quantile) exactly via NF’s loss constructors; sCRPS is available in NF losses/metrics and will be our primary score. 
+> **Loss selection**: Use **StudentT** (distributional) and **MQLoss/IQLoss** (quantile) exactly via NF’s loss constructors; sCRPS is available in NF losses/metrics and will be our primary score.
 
 ---
 
@@ -1958,31 +1950,31 @@ All names in the PatchTST signature (includes `patch_len`, `stride`, `n_heads`, 
 
 1. **Pilot (cheap)**
 
-   * Horizon: **h=16** only.
-   * Windows: **n_windows=3**, `step_size=16`, `val_size=64`, `refit=1`.
-   * Sweep **at most 6–8 configs per model** using the ranges above.
-   * Train both **StudentT** and **MQ** for **one** architecture if GPU budget is tight; otherwise both for all.
-   * **Promote** any config that beats your current intra-model baseline by **≥1.5% mean sCRPS** (or is statistically tied but yields **better coverage** at 90%).
-     (All CV args are NF-native; see `cross_validation` docs.) 
+   - Horizon: **h=16** only.
+   - Windows: **n_windows=3**, `step_size=16`, `val_size=64`, `refit=1`.
+   - Sweep **at most 6–8 configs per model** using the ranges above.
+   - Train both **StudentT** and **MQ** for **one** architecture if GPU budget is tight; otherwise both for all.
+   - **Promote** any config that beats your current intra-model baseline by **≥1.5% mean sCRPS** (or is statistically tied but yields **better coverage** at 90%).
+     (All CV args are NF-native; see `cross_validation` docs.)
 
 2. **Promote (moderate)**
 
-   * Same horizon (**h=16**), use **n_windows=6**, `step_size=16`, `val_size=64`, `refit=1`.
-   * Keep at most **2 configs per model** (one distributional, one quantile).
-   * If quantile crossing appears, re-run with **IQLoss** (ISQF) or defer to conformal later. Loss classes & sCRPS are in NF losses docs. 
+   - Same horizon (**h=16**), use **n_windows=6**, `step_size=16`, `val_size=64`, `refit=1`.
+   - Keep at most **2 configs per model** (one distributional, one quantile).
+   - If quantile crossing appears, re-run with **IQLoss** (ISQF) or defer to conformal later. Loss classes & sCRPS are in NF losses docs.
 
 3. **Full CV (final)**
 
-   * Run **all horizons**: h ∈ {4, 8, 16, 32}.
-   * Windows: **n_windows=10**, `step_size=h`, `val_size=4*h`, `refit=1` (as defined in §5).
-   * **Select** per horizon by mean **sCRPS** (primary), with coverage sanity (±2% at 80/90/95) as a tie-breaker; see §8 for simple ensembling rules.
+   - Run **all horizons**: h ∈ {4, 8, 16, 32}.
+   - Windows: **n_windows=10**, `step_size=h`, `val_size=4*h`, `refit=1` (as defined in §5).
+   - **Select** per horizon by mean **sCRPS** (primary), with coverage sanity (±2% at 80/90/95) as a tie-breaker; see §8 for simple ensembling rules.
 
 4. **Stop rules**
 
-   * If adding capacity (layers/hidden size) **improves mean sCRPS < \~1%**, stop increasing.
-   * If `input_size↑` by 50% yields **no** consistent sCRPS lift and hurts throughput, revert.
+   - If adding capacity (layers/hidden size) **improves mean sCRPS < \~1%**, stop increasing.
+   - If `input_size↑` by 50% yields **no** consistent sCRPS lift and hurts throughput, revert.
 
-> **Why not full HPO?** You don’t need Optuna/Ray for these small spaces. If time-boxed HPO is desired later, NF **Auto*** models provide built-in search orchestration across these ctor args (Ray/Optuna); we keep it off for v1 to avoid complexity. 
+> **Why not full HPO?** You don’t need Optuna/Ray for these small spaces. If time-boxed HPO is desired later, NF **Auto*** models provide built-in search orchestration across these ctor args (Ray/Optuna); we keep it off for v1 to avoid complexity.
 
 ---
 
@@ -2039,7 +2031,7 @@ PatchTST:
   max_steps: [10000, 20000]
 ```
 
-> Parameter names map exactly to the model signatures in NF docs (NHITS/NBEATSx/TiDE/PatchTST). 
+> Parameter names map exactly to the model signatures in NF docs (NHITS/NBEATSx/TiDE/PatchTST).
 
 **Tiny search helper (uses your §4 factory & §5 CV):**
 
@@ -2121,29 +2113,29 @@ print(leader.head(10))
 PY
 ```
 
-> This **does not** replace NF CV. It wraps **your** §4 factory and **NF’s** `cross_validation`. There is **no** custom scoring beyond simple aggregation. (All NF CV semantics per docs.) 
+> This **does not** replace NF CV. It wraps **your** §4 factory and **NF’s** `cross_validation`. There is **no** custom scoring beyond simple aggregation. (All NF CV semantics per docs.)
 
 ---
 
 ### 6.4 Promotion thresholds & bookkeeping
 
-* **Promotion rule:** promote only configs with **≥1.5%** mean **sCRPS** gain vs. current per-model baseline (or indistinguishable sCRPS but **better coverage** at 90%).
-* **Cap survivors:** keep **≤2** configs per model for full CV (one **StudentT**, one **MQ/IQ**).
-* **Artifacts:** persist `hpo_leaderboard.parquet` per horizon, plus the exact YAML (frozen) used.
+- **Promotion rule:** promote only configs with **≥1.5%** mean **sCRPS** gain vs. current per-model baseline (or indistinguishable sCRPS but **better coverage** at 90%).
+- **Cap survivors:** keep **≤2** configs per model for full CV (one **StudentT**, one **MQ/IQ**).
+- **Artifacts:** persist `hpo_leaderboard.parquet` per horizon, plus the exact YAML (frozen) used.
 
 ---
 
 ### 6.5 Practical guards (don’t ignore)
 
-* **OOM on PatchTST/NHITS:** drop `batch_size`, reduce `hidden_size`/`n_heads` (PatchTST), or shorten `input_size`. PatchTST’s args exist precisely for this. 
-* **Overfitting:** if train loss keeps falling but val sCRPS flatlines, **lower** `max_steps`, **increase** `early_stop_patience_steps` to 400, or **add** small dropout (0.1–0.2). NF exposes `dropout`/`dropout_prob_theta` where appropriate. 
-* **Scale drift:** if live coverage decays, trial **RevIN** (`revin=True` in PatchTST; or switch `scaler_type` to `"revin"` for others). Temporal scalers list includes `'revin'`. 
+- **OOM on PatchTST/NHITS:** drop `batch_size`, reduce `hidden_size`/`n_heads` (PatchTST), or shorten `input_size`. PatchTST’s args exist precisely for this.
+- **Overfitting:** if train loss keeps falling but val sCRPS flatlines, **lower** `max_steps`, **increase** `early_stop_patience_steps` to 400, or **add** small dropout (0.1–0.2). NF exposes `dropout`/`dropout_prob_theta` where appropriate.
+- **Scale drift:** if live coverage decays, trial **RevIN** (`revin=True` in PatchTST; or switch `scaler_type` to `"revin"` for others). Temporal scalers list includes `'revin'`.
 
 ---
 
 ### 6.6 (Optional) Using NF Auto* for time-boxed HPO (only if needed)
 
-If you need automated search without writing loops, NF exposes **AutoModels** (e.g., `AutoNHITS`, `AutoPatchTST`) that run grid/random/Bayesian search and pick the best config on a validation set (Ray/Optuna backends). Keep disabled for v1 to avoid moving parts; consider only if the tiny grids above stall. 
+If you need automated search without writing loops, NF exposes **AutoModels** (e.g., `AutoNHITS`, `AutoPatchTST`) that run grid/random/Bayesian search and pick the best config on a validation set (Ray/Optuna backends). Keep disabled for v1 to avoid moving parts; consider only if the tiny grids above stall.
 
 ---
 
@@ -2163,10 +2155,10 @@ In summary, the output of this stage for each horizon is either one chosen model
 
 ### 7.1 Selection protocol (per horizon)
 
-* **Input:** `experiments/h{h}/cv_raw.parquet` (from §5) merged with `y`.
-* **Primary ranker:** mean **sCRPS** across CV windows (use dense quantiles only for promoted configs; otherwise use MAE as a temporary ranker).
-* **Stability tie-breakers:** (1) sCRPS std across windows (lower is better), (2) empirical coverage closeness at 90%, (3) MAE.
-* **Winner per h:** the single model with best mean sCRPS (or, if dense quantiles absent, the one that will be re-run with dense quantiles to compute sCRPS before finalizing).
+- **Input:** `experiments/h{h}/cv_raw.parquet` (from §5) merged with `y`.
+- **Primary ranker:** mean **sCRPS** across CV windows (use dense quantiles only for promoted configs; otherwise use MAE as a temporary ranker).
+- **Stability tie-breakers:** (1) sCRPS std across windows (lower is better), (2) empirical coverage closeness at 90%, (3) MAE.
+- **Winner per h:** the single model with best mean sCRPS (or, if dense quantiles absent, the one that will be re-run with dense quantiles to compute sCRPS before finalizing).
 
 **Deliverable:** a CSV `experiments/h{h}/leaderboard.csv` with columns:
 `model, mean_sCRPS, std_sCRPS, MAE, RMSE, cov80, cov90, cov95`.
@@ -2179,12 +2171,12 @@ In summary, the output of this stage for each horizon is either one chosen model
 
 **Rules:**
 
-* **Point forecasts:** equal-weight mean (`(A+B)/2`) or median-of-two (same as mean).
-* **Intervals/quantiles:**
+- **Point forecasts:** equal-weight mean (`(A+B)/2`) or median-of-two (same as mean).
+- **Intervals/quantiles:**
 
-  * If you have **quantiles**: average quantiles level-wise (e.g., `q̂_0.9^ens = 0.5*q̂_0.9^A + 0.5*q̂_0.9^B`). This preserves monotonicity.
-  * If you only have **lo/hi** at levels (80/90/95): average lo’s and hi’s level-wise. If calibration drifts low, use conservative combine: `lo=min(lo_A,lo_B)`, `hi=max(hi_A,hi_B)`.
-* **Do not** mix param distributions (e.g., don’t average Student-t parameters). Stay in the prediction/quantile space.
+  - If you have **quantiles**: average quantiles level-wise (e.g., `q̂_0.9^ens = 0.5*q̂_0.9^A + 0.5*q̂_0.9^B`). This preserves monotonicity.
+  - If you only have **lo/hi** at levels (80/90/95): average lo’s and hi’s level-wise. If calibration drifts low, use conservative combine: `lo=min(lo_A,lo_B)`, `hi=max(hi_A,hi_B)`.
+- **Do not** mix param distributions (e.g., don’t average Student-t parameters). Stay in the prediction/quantile space.
 
 **Adoption threshold:** Adopt the ensemble **only if** it improves mean sCRPS by **≥1.0%** (or equals sCRPS but improves 90% coverage toward nominal). Otherwise, ship the best single model.
 
@@ -2255,21 +2247,21 @@ def evaluate_top2_ensemble(cv_df: pd.DataFrame, top2: Tuple[str,str], alias: str
 3. Build an **ENS2** equal-weight blend via `evaluate_top2_ensemble`.
 4. Compare metrics:
 
-   * If `ENS2.mean_sCRPS ≤ best.mean_sCRPS * 0.99` (≥1% better) **and** coverage at 90% isn’t worse by >1.5pp, **adopt** ENS2.
-   * Else **keep** best single model.
+   - If `ENS2.mean_sCRPS ≤ best.mean_sCRPS * 0.99` (≥1% better) **and** coverage at 90% isn’t worse by >1.5pp, **adopt** ENS2.
+   - Else **keep** best single model.
 5. Persist:
 
-   * `experiments/h{h}/selection.json` with `{ "winner": "<alias>", "members": ["A","B"]? }`
-   * If winner is ensemble, also store its **member model paths** for reproducible retraining/inference.
+   - `experiments/h{h}/selection.json` with `{ "winner": "<alias>", "members": ["A","B"]? }`
+   - If winner is ensemble, also store its **member model paths** for reproducible retraining/inference.
 
 ### 7.5 Final fit & save (single vs ensemble)
 
-* **Single winner:**
+- **Single winner:**
 
-  * Refit the winning config on **all data** (using `val_size` for early stopping).
-  * `nf.save("experiments/h{h}/best/", save_dataset=True, overwrite=True)`.
+  - Refit the winning config on **all data** (using `val_size` for early stopping).
+  - `nf.save("experiments/h{h}/best/", save_dataset=True, overwrite=True)`.
 
-* **Ensemble winner:** two pragmatic options:
+- **Ensemble winner:** two pragmatic options:
 
   1. **Save both constituent models** separately under `experiments/h{h}/best/A/` and `.../B/`. In inference, **load both** and blend predictions on the fly (equal-weight).
   2. **One NF object containing both models:** Save that ensemble directory and at inference time, compute both and blend via the same utility.
@@ -2280,19 +2272,19 @@ def evaluate_top2_ensemble(cv_df: pd.DataFrame, top2: Tuple[str,str], alias: str
 
 In `run_predict.py`:
 
-* Load the two saved NF objects (or one with two models).
-* Produce predictions for each.
-* Apply the **same equal-weight** logic to create `ENS2` columns (including intervals/quantiles).
-* If conformal was adopted later, apply the same conformal **adjustment deltas** to the ensemble bounds (store deltas per level per horizon in `experiments/h{h}/conformal.json`).
+- Load the two saved NF objects (or one with two models).
+- Produce predictions for each.
+- Apply the **same equal-weight** logic to create `ENS2` columns (including intervals/quantiles).
+- If conformal was adopted later, apply the same conformal **adjustment deltas** to the ensemble bounds (store deltas per level per horizon in `experiments/h{h}/conformal.json`).
 
 ### 7.7 Guardrails
 
-* Don’t ensemble a **quantile** model with a **distributional** one unless you are averaging **quantiles** (request levels for the distributional model; never average params).
-* If one model lacks intervals, you can:
+- Don’t ensemble a **quantile** model with a **distributional** one unless you are averaging **quantiles** (request levels for the distributional model; never average params).
+- If one model lacks intervals, you can:
 
-  * request levels during prediction for both, or
-  * blend **point** only and report intervals from the better-calibrated member (not ideal; prefer requesting levels for both).
-* Keep **exact** column naming stable: `ENS2` becomes just another model name for downstream code.
+  - request levels during prediction for both, or
+  - blend **point** only and report intervals from the better-calibrated member (not ideal; prefer requesting levels for both).
+- Keep **exact** column naming stable: `ENS2` becomes just another model name for downstream code.
 
 ---
 
@@ -2310,17 +2302,17 @@ If a model has high sharpness (narrow intervals) but under-covers (actual covera
 
 We will use the cross-val results to decide: - If distribution models consistently miss the mark on coverage (say 80% interval only covers 60% of real points), whereas quantile models do better, we might favor quantile loss. - Or vice versa: maybe Student-T gives a better log-likelihood and calibrated tails, then stick with it.
 
-* **Start with two parallel trainings per model config (per §4/§6):**
+- **Start with two parallel trainings per model config (per §4/§6):**
 
-  1. **Distributional**: `loss=DistributionLoss("StudentT")` — robust to heavy-tailed intraday returns. 
+  1. **Distributional**: `loss=DistributionLoss("StudentT")` — robust to heavy-tailed intraday returns.
   2. **Quantile**: `loss=MQLoss(...)` (or **IQLoss/ISQF** if you see quantile crossing). NF exposes these losses in its PyTorch losses module.
-* **Selection protocol:** choose by **mean sCRPS** on CV windows (primary), with empirical coverage at **90%** as tie-breaker. NF documents sCRPS in the losses/metrics section. 
-* **Symptoms & switches:**
+- **Selection protocol:** choose by **mean sCRPS** on CV windows (primary), with empirical coverage at **90%** as tie-breaker. NF documents sCRPS in the losses/metrics section.
+- **Symptoms & switches:**
 
-  * **Under-dispersion (too narrow)**: U-shaped PIT; low coverage → prefer quantile training or keep distributional and add **conformal** (below). Gneiting & Raftery recommend PIT to assess calibration.
-  * **Quantile crossing**: switch MQLoss → **IQLoss/ISQF** (monotone quantiles), or keep MQLoss and apply conformal.
+  - **Under-dispersion (too narrow)**: U-shaped PIT; low coverage → prefer quantile training or keep distributional and add **conformal** (below). Gneiting & Raftery recommend PIT to assess calibration.
+  - **Quantile crossing**: switch MQLoss → **IQLoss/ISQF** (monotone quantiles), or keep MQLoss and apply conformal.
 
-> **NF wiring:** quantiles/intervals are requested at prediction via `predict(level=[80,90,95])` (intervals) or `predict(quantiles=[...])` (quantile grid). 
+> **NF wiring:** quantiles/intervals are requested at prediction via `predict(level=[80,90,95])` (intervals) or `predict(quantiles=[...])` (quantile grid).
 
 ### 8.2 Conformal prediction intervals
 
@@ -2340,8 +2332,8 @@ One caution: Conformal intervals are typically **constant width for all forecast
 
 We will apply conformal after model selection: - For the final selected model (per horizon), use recent backtest residuals to compute an *interval adjustment factor* for each desired level. - Then when outputting live forecasts, take the model’s prediction (mean or median) and add/subtract this delta for the interval bounds.
 
-* **When:** if CV/test coverage at **80/90/95** misses nominal by > **±2pp**, attach **Conformal Prediction**. NF provides a tutorial and utilities to conformalize model outputs—don’t hack losses to “fix” coverage. 
-* **What it does:** builds **finite-sample calibrated** intervals on top of any forecaster (neural or classical). (StatsForecast docs summarize the same approach.) 
+- **When:** if CV/test coverage at **80/90/95** misses nominal by > **±2pp**, attach **Conformal Prediction**. NF provides a tutorial and utilities to conformalize model outputs—don’t hack losses to “fix” coverage.
+- **What it does:** builds **finite-sample calibrated** intervals on top of any forecaster (neural or classical). (StatsForecast docs summarize the same approach.)
 
 **Minimal NF pattern (attach during fit/CV):**
 
@@ -2361,9 +2353,9 @@ cv_df = nf.cross_validation(df=nf_df,
 # Columns will include Model-lo-90/Model-hi-90, etc., now conformalized.
 ```
 
-*(Use the same idea when calling `fit(...)` if you want conformal intervals during a single split; see NF’s conformal tutorial.)* 
+*(Use the same idea when calling `fit(...)` if you want conformal intervals during a single split; see NF’s conformal tutorial.)*
 
-* **Acceptance band:** after conformalization, require coverage within **±2pp** at 80/90/95 on the **test tail** (not only CV). Store the empirical coverage deltas with the model artifact for use in live inference.
+- **Acceptance band:** after conformalization, require coverage within **±2pp** at 80/90/95 on the **test tail** (not only CV). Store the empirical coverage deltas with the model artifact for use in live inference.
 
 ### 8.3 Diagnostic checks
 
@@ -2373,9 +2365,9 @@ We are particularly interested in the extreme tail behavior – a Student-T with
 
 In summary, we ensure the final forecasting system not only provides a “best guess” but also a realistic uncertainty range that users can trust.
 
-* **Coverage table** at 80/90/95 on CV windows and test tail (by horizon).
-* **PIT histogram** (approximate; rank-based on quantile grid) → should be \~Uniform\[0,1]. U-shape = under-dispersed; hump = over-dispersed; skewed = biased.
-* **Coverage by volatility deciles** (sort by rolling σ of returns) to detect heteroscedastic under-coverage.
+- **Coverage table** at 80/90/95 on CV windows and test tail (by horizon).
+- **PIT histogram** (approximate; rank-based on quantile grid) → should be \~Uniform\[0,1]. U-shape = under-dispersed; hump = over-dispersed; skewed = biased.
+- **Coverage by volatility deciles** (sort by rolling σ of returns) to detect heteroscedastic under-coverage.
 
 **Tiny glue (append to `uq/diag.py`):**
 
@@ -2412,17 +2404,17 @@ def coverage_by_vol_decile(preds: pd.DataFrame, vol: pd.Series, model: str, leve
 
 ### 8.4 Practical fixes (pick the smallest hammer)
 
-* **Under-dispersion (U-shaped PIT; low coverage):**
+- **Under-dispersion (U-shaped PIT; low coverage):**
 
   1. Increase quantile grid (for MQ/IQ) or request denser `level=[... ]` for distributional to improve sCRPS estimate,
   2. **Attach conformal** (preferred),
-  3. If still poor, trial **`scaler_type="invariant"`** or **RevIN** to stabilize scale (NF TemporalNorm docs). 
-* **Over-dispersion (hump PIT; wide intervals):**
+  3. If still poor, trial **`scaler_type="invariant"`** or **RevIN** to stabilize scale (NF TemporalNorm docs).
+- **Over-dispersion (hump PIT; wide intervals):**
 
   1. Reduce dropout a notch (if excessive),
   2. Switch to **StudentT** from over-widened quantiles (or tighten quantile set),
   3. Re-check feature cap (too many weak, noisy exogs can inflate uncertainty).
-* **Skewed PIT (systematic bias):**
+- **Skewed PIT (systematic bias):**
 
   1. Add/keep **calendar futr_exogs**;
   2. Ensure **MTF alignment + shift(1)** is correct (leakage can fake bias);
@@ -2430,10 +2422,10 @@ def coverage_by_vol_decile(preds: pd.DataFrame, vol: pd.Series, model: str, leve
 
 ### 8.5 What to persist for calibration
 
-* `experiments/h{h}/leaderboard.parquet` — includes coverage at all levels and (when computed) sCRPS.
-* `experiments/h{h}/pit_hist.png` — PIT diagnostics for finalists.
-* If conformal is used: `experiments/h{h}/conformal.json` — store method, levels, and per-level **empirical deltas** (useful to sanity-check live drift).
-* `reports/h{h}/vol_decile_coverage.csv` — coverage by volatility decile.
+- `experiments/h{h}/leaderboard.parquet` — includes coverage at all levels and (when computed) sCRPS.
+- `experiments/h{h}/pit_hist.png` — PIT diagnostics for finalists.
+- If conformal is used: `experiments/h{h}/conformal.json` — store method, levels, and per-level **empirical deltas** (useful to sanity-check live drift).
+- `reports/h{h}/vol_decile_coverage.csv` — coverage by volatility decile.
 
 ---
 
@@ -2454,7 +2446,8 @@ step_size: 16
 refit: true
 
 models:  
-  - name: "NHITS-StudentT"  
+
+- name: "NHITS-StudentT"  
     class: NHITS  
     loss: DistributionLoss  
     distribution: StudentT  
@@ -2462,12 +2455,12 @@ models:
     dropout_prob_theta: 0.1  
     early_stop_patience_steps: 400  
     \# ... other hyperparams or defaults  
-  - name: "NHITS-MQ"  
+- name: "NHITS-MQ"  
     class: NHITS  
     loss: MQLoss  
     level: \[10,50,90\]  
     input_size: 1024  
-  - name: "PatchTST-StudentT"  
+- name: "PatchTST-StudentT"  
     class: PatchTST  
     loss: DistributionLoss  
     distribution: StudentT  
@@ -2485,8 +2478,8 @@ Global settings like freq and CV parameters can be shared or repeated in each co
 
 > **Files** (under `/experiments/`): keep one YAML per horizon and one global defaults file.
 >
-> * `experiments/defaults.yaml` — global switches; imported by per-horizon YAMLs.
-> * `experiments/h{h}.yaml` — horizon-specific overrides (models, windows, levels).
+> - `experiments/defaults.yaml` — global switches; imported by per-horizon YAMLs.
+> - `experiments/h{h}.yaml` — horizon-specific overrides (models, windows, levels).
 
 **`experiments/defaults.yaml`**
 
@@ -2665,13 +2658,12 @@ if __name__ == "__main__":
 
 **Why this is correct (and lean):**
 
-* `fit(..., val_size=...)` is NF-native and stores the dataset for later `predict_insample`. 
-* `predict_insample(step_size, level|quantiles)` is the official way to get train/val backcasts for diagnostics. 
-* `cross_validation(n_windows, step_size, val_size, refit, level|quantiles)` is NF’s CV; we don’t write our own. 
-* `save/load` uses the NF capability that persists model weights/config + dataset. 
+- `fit(..., val_size=...)` is NF-native and stores the dataset for later `predict_insample`.
+- `predict_insample(step_size, level|quantiles)` is the official way to get train/val backcasts for diagnostics.
+- `cross_validation(n_windows, step_size, val_size, refit, level|quantiles)` is NF’s CV; we don’t write our own.
+- `save/load` uses the NF capability that persists model weights/config + dataset.
 
-> **sCRPS note:** NF exposes **`sCRPS`** in `neuralforecast.losses.pytorch` for evaluation. If you request **dense quantiles** at CV/predict time (`quantiles=[0.01,...,0.99]`), compute sCRPS on promoted configs precisely with NF’s metric. Keep the dense grid **only for finalists** to control runtime. 
-
+> **sCRPS note:** NF exposes **`sCRPS`** in `neuralforecast.losses.pytorch` for evaluation. If you request **dense quantiles** at CV/predict time (`quantiles=[0.01,...,0.99]`), compute sCRPS on promoted configs precisely with NF’s metric. Keep the dense grid **only for finalists** to control runtime.
 
 ### 9.3 `run_predict.py` — batch inference with PIs, save/load
 
@@ -2701,7 +2693,7 @@ Memory: our models are not huge (except maybe PatchTST) – we expect a few hund
 
 Finally, ensure the inference pipeline handles exceptions (e.g., if data is missing or model isn’t loaded) gracefully – log error and continue.
 
-> **Path:** `run_predict.py`. This loads the selected model(s) (single or the two members of your §7 ENS2), rebuilds the **tail** exogs (already leakage-safe), and calls `predict(level=[80,90,95])`. `predict` accepts `level` or `quantiles`; if using ensembles, blend predictions **after** calling `predict`. 
+> **Path:** `run_predict.py`. This loads the selected model(s) (single or the two members of your §7 ENS2), rebuilds the **tail** exogs (already leakage-safe), and calls `predict(level=[80,90,95])`. `predict` accepts `level` or `quantiles`; if using ensembles, blend predictions **after** calling `predict`.
 
 ```python
 # run_predict.py
@@ -2740,26 +2732,26 @@ if __name__ == "__main__":
 
 **Notes:**
 
-* `NeuralForecast.load(path)` returns a ready NF object; call `predict(level=...)` on a properly prepared frame. 
-* If you conformalized in training (see §8), the saved object can carry that configuration; interval columns produced during `predict`/`cross_validation` follow the NF naming (`Model-lo-90`, `Model-hi-90`). 
+- `NeuralForecast.load(path)` returns a ready NF object; call `predict(level=...)` on a properly prepared frame.
+- If you conformalized in training (see §8), the saved object can carry that configuration; interval columns produced during `predict`/`cross_validation` follow the NF naming (`Model-lo-90`, `Model-hi-90`).
 
 ### 9.4 Artifacts & file layout (enforced)
 
-* `experiments/h{h}/insample.parquet` — train/val backcasts from `predict_insample` (for PIT/coverage). 
-* `experiments/h{h}/cv_raw.parquet` — NF CV outputs (point + PIs if requested). 
-* `experiments/h{h}/leaderboard.parquet` — per-model sCRPS/MAE/RMSE/coverage (from §5 aggregator).
-* `experiments/h{h}/coverage.parquet` — empirical coverage at 80/90/95.
-* `experiments/h{h}/chkpt/` — optional saved NF object (if `--save`). 
-* `reports/h{h}/preds_*.parquet` — live/batch prediction drops (with PIs).
-* If conformal used: `experiments/h{h}/conformal.json` with method/levels/deltas (see §8).
+- `experiments/h{h}/insample.parquet` — train/val backcasts from `predict_insample` (for PIT/coverage).
+- `experiments/h{h}/cv_raw.parquet` — NF CV outputs (point + PIs if requested).
+- `experiments/h{h}/leaderboard.parquet` — per-model sCRPS/MAE/RMSE/coverage (from §5 aggregator).
+- `experiments/h{h}/coverage.parquet` — empirical coverage at 80/90/95.
+- `experiments/h{h}/chkpt/` — optional saved NF object (if `--save`).
+- `reports/h{h}/preds_*.parquet` — live/batch prediction drops (with PIs).
+- If conformal used: `experiments/h{h}/conformal.json` with method/levels/deltas (see §8).
 
 ### 9.5 Make it hard to shoot yourself in the foot
 
-* **Always** run `fit(..., val_size=...)` before `predict_insample` — it uses the **stored dataset** from the last `fit`/`cross_validation`. 
-* Ensure `df` in `predict` includes **future** rows (`ds` beyond last train `ds`) with **futr_exog_list** populated; else NF can’t produce h steps. Predict’s `futr_df` argument exists for future exogs if you keep train df separate. 
-* **Set `step_size=h`** in CV to avoid window overlap (per your §5 policy); `refit=1` to retrain each window. 
-* **Use NF scalers** via `scaler_type`/`revin` only; do not add ad-hoc scaling. TemporalNorm supports `robust`, `invariant`, `revin`, etc. 
-* **Persist exactly once** with `nf.save(path, save_dataset=True)`; reload later with `NeuralForecast.load(path)`. Names/semantics are in the save/load tutorial. 
+- **Always** run `fit(..., val_size=...)` before `predict_insample` — it uses the **stored dataset** from the last `fit`/`cross_validation`.
+- Ensure `df` in `predict` includes **future** rows (`ds` beyond last train `ds`) with **futr_exog_list** populated; else NF can’t produce h steps. Predict’s `futr_df` argument exists for future exogs if you keep train df separate.
+- **Set `step_size=h`** in CV to avoid window overlap (per your §5 policy); `refit=1` to retrain each window.
+- **Use NF scalers** via `scaler_type`/`revin` only; do not add ad-hoc scaling. TemporalNorm supports `robust`, `invariant`, `revin`, etc.
+- **Persist exactly once** with `nf.save(path, save_dataset=True)`; reload later with `NeuralForecast.load(path)`. Names/semantics are in the save/load tutorial.
 
 ---
 
@@ -2783,14 +2775,14 @@ Steps for the live loop (could be a cron job or daemon): 1\. **Append new data:*
 2. **Append the last bar** (OHLCV for the just-closed 15-min interval) to the canonical frame; keep UTC EOB stamps.
 3. **Rebuild exogs for the tail window** only (not the whole history):
 
-   * Recompute **base-TF indicators** whose rolling windows touch the last bar.
-   * Recompute **MTF** (30m/1h/4h) aggregates that close at this timestamp; forward-fill to 15m.
-   * Apply the central **`shift(1)`** to *all* historic exogs.
+   - Recompute **base-TF indicators** whose rolling windows touch the last bar.
+   - Recompute **MTF** (30m/1h/4h) aggregates that close at this timestamp; forward-fill to 15m.
+   - Apply the central **`shift(1)`** to *all* historic exogs.
 4. **Build future calendar (`futr_exog`) for the next `h` steps**: `minute_of_day`, `day_of_week`, `is_weekend` (and any other future-known features you kept).
 5. **Predict with NF** for each horizon `h ∈ {4,8,16,32}`:
 
-   * Load the saved winner (or two members if ENS2).
-   * Call `predict(...)` with `level=[80,90,95]`. If you maintain future calendars separately, pass them via `futr_df=`; otherwise, append rows with future timestamps + `futr_exog` to the same frame and call `predict(df=...)`.
+   - Load the saved winner (or two members if ENS2).
+   - Call `predict(...)` with `level=[80,90,95]`. If you maintain future calendars separately, pass them via `futr_df=`; otherwise, append rows with future timestamps + `futr_exog` to the same frame and call `predict(df=...)`.
 6. **Export artifacts**: parquet of predictions (point + PIs) with timestamped filename in `reports/h{h}/`.
 7. **Graceful fallback** (if GPU OOM or model failure): reduce batch, drop PatchTST first, or fall back to the previous checkpoint’s predictions; **log loudly** and continue.
 
@@ -2931,33 +2923,33 @@ if __name__ == "__main__":
 
 **Notes:**
 
-* `NeuralForecast.load(path)` → `predict(df=..., futr_df=..., level=[...])`. If you trained with **calendar futr_exogs**, pass `futr_df` (preferred). Alternatively, you can append those future rows to `df` and call `predict(df=...)`.
-* If you adopted **ENS2** (equal-weight of two winners), keep a tiny wrapper: load both `NeuralForecast` objects, call `predict` for each, and blend columns via the same logic you used in §7. Keep it **post-predict** (don’t average parameters).
+- `NeuralForecast.load(path)` → `predict(df=..., futr_df=..., level=[...])`. If you trained with **calendar futr_exogs**, pass `futr_df` (preferred). Alternatively, you can append those future rows to `df` and call `predict(df=...)`.
+- If you adopted **ENS2** (equal-weight of two winners), keep a tiny wrapper: load both `NeuralForecast` objects, call `predict` for each, and blend columns via the same logic you used in §7. Keep it **post-predict** (don’t average parameters).
 
 ### 10.4 Throughput & memory guards (graceful degradation)
 
-* **Batch/hidden sizes:** If you see OOM, reduce `batch_size` first; then reduce `hidden_size`/`n_heads` (PatchTST) **at retrain time**; at inference time, your only knobs are `batch_size` (if exposed by NF predict) and moving to CPU.
-* **Model triage:** If inference exceeds your latency budget, **drop PatchTST** first (heaviest), keep NHITS/NBEATSx.
-* **Numerical sanity:** Disable gradients (`torch.set_grad_enabled(False)`), and keep models in `eval()` mode (NF sets this internally on predict).
-* **I/O:** Avoid full-history recompute; use `build_tail_exogs` to only touch the last `max_input_size + margins` rows.
-* **Missing bar:** If the just-closed EOB bar is missing or incomplete, **skip this cycle** and log it—do **not** backfill `y`. You’re forecasting returns; a fake bar will poison scaling and exogs.
+- **Batch/hidden sizes:** If you see OOM, reduce `batch_size` first; then reduce `hidden_size`/`n_heads` (PatchTST) **at retrain time**; at inference time, your only knobs are `batch_size` (if exposed by NF predict) and moving to CPU.
+- **Model triage:** If inference exceeds your latency budget, **drop PatchTST** first (heaviest), keep NHITS/NBEATSx.
+- **Numerical sanity:** Disable gradients (`torch.set_grad_enabled(False)`), and keep models in `eval()` mode (NF sets this internally on predict).
+- **I/O:** Avoid full-history recompute; use `build_tail_exogs` to only touch the last `max_input_size + margins` rows.
+- **Missing bar:** If the just-closed EOB bar is missing or incomplete, **skip this cycle** and log it—do **not** backfill `y`. You’re forecasting returns; a fake bar will poison scaling and exogs.
 
 ### 10.5 Live conformal & monitoring hooks
 
-* If you saved a conformalized NF object in training, your `predict(level=[...])` will emit conformal intervals directly.
-* If not, but you stored per-level **coverage deltas** in `experiments/h{h}/conformal.json` (from §8), track **live** empirical coverage over a sliding window (e.g., last 7 days) and alert if drift exceeds **±3pp** at any of 80/90/95. Don’t “patch” intervals online; schedule a **retrain** (see §12) or attach conformal and re-save the model.
+- If you saved a conformalized NF object in training, your `predict(level=[...])` will emit conformal intervals directly.
+- If not, but you stored per-level **coverage deltas** in `experiments/h{h}/conformal.json` (from §8), track **live** empirical coverage over a sliding window (e.g., last 7 days) and alert if drift exceeds **±3pp** at any of 80/90/95. Don’t “patch” intervals online; schedule a **retrain** (see §12) or attach conformal and re-save the model.
 
 ### 10.6 Minimal assertions in the live loop (don’t skip)
 
-* **UTC EOB alignment:** the last row’s `ds` must match a 15-minute boundary; otherwise bail.
-* **Leakage guard:** after `postprocess_shift_and_prune`, re-check a tiny sample with `assert_shifted` when debugging new indicators; disable in production for latency once stable.
-* **Future calendars present:** verify `futr_df` has exactly `h` rows with the right columns; if not, don’t predict and log loudly.
+- **UTC EOB alignment:** the last row’s `ds` must match a 15-minute boundary; otherwise bail.
+- **Leakage guard:** after `postprocess_shift_and_prune`, re-check a tiny sample with `assert_shifted` when debugging new indicators; disable in production for latency once stable.
+- **Future calendars present:** verify `futr_df` has exactly `h` rows with the right columns; if not, don’t predict and log loudly.
 
 ### 10.7 Integration points (where this plugs into the rest)
 
-* **From §7:** If the winner is an ensemble, replicate the **equal-weight** logic here after calling `predict` on each constituent.
-* **From §3:** Tail builders reuse `features.builder.*` (vectorbt/TA-Lib primary; pandas-ta-openbb + freqtrade/technical for MTF). They centralize `shift(1)` to guarantee no leakage.
-* **From §9:** Reuse the same `levels=[80,90,95]` and `freq="15min"` from the YAML; don’t fork config.
+- **From §7:** If the winner is an ensemble, replicate the **equal-weight** logic here after calling `predict` on each constituent.
+- **From §3:** Tail builders reuse `features.builder.*` (vectorbt/TA-Lib primary; pandas-ta-openbb + freqtrade/technical for MTF). They centralize `shift(1)` to guarantee no leakage.
+- **From §9:** Reuse the same `levels=[80,90,95]` and `freq="15min"` from the YAML; don’t fork config.
 
 ---
 
@@ -2983,26 +2975,26 @@ Forecasting models need periodic retraining to incorporate the most recent data 
 
 **Hard triggers (retrain within 24h):**
 
-* **Coverage drift:** rolling **7-day** empirical coverage at any of {80,90,95} deviates by **>±3pp** from nominal.
-* **Score decay:** 7-day mean sCRPS (or MAE if sCRPS not computed live) degrades **>3%** vs. the trailing 30-day baseline.
-* **Distribution shift:** PSI (Population Stability Index) on **key hist exogs** or **target returns** exceeds **0.2** (moderate) for 3 consecutive days, or **≥0.3** (major) on any day.
-* **Operational:** sustained GPU OOM or latency breaches for 3+ consecutive cycles after simple batch/size reductions (§10.4).
+- **Coverage drift:** rolling **7-day** empirical coverage at any of {80,90,95} deviates by **>±3pp** from nominal.
+- **Score decay:** 7-day mean sCRPS (or MAE if sCRPS not computed live) degrades **>3%** vs. the trailing 30-day baseline.
+- **Distribution shift:** PSI (Population Stability Index) on **key hist exogs** or **target returns** exceeds **0.2** (moderate) for 3 consecutive days, or **≥0.3** (major) on any day.
+- **Operational:** sustained GPU OOM or latency breaches for 3+ consecutive cycles after simple batch/size reductions (§10.4).
 
 **Soft triggers (evaluate next scheduled retrain):**
 
-* Volatility regime change (top volatility decile share > 35% of bars over 7 days).
-* Calendar effect drift (coverage differs by >5pp between weekdays vs. weekends).
+- Volatility regime change (top volatility decile share > 35% of bars over 7 days).
+- Calendar effect drift (coverage differs by >5pp between weekdays vs. weekends).
 
 ### 11.2 Versioning & pinning (don’t be sloppy)
 
-* **Freeze at train time:** write `experiments/h{h}/version_manifest.json` with:
+- **Freeze at train time:** write `experiments/h{h}/version_manifest.json` with:
 
-  * `python`, `pytorch`, `cuda`, `neuralforecast`, `statsforecast`, `mlforecast`, `hierarchicalforecast` versions,
-  * git commit hash,
-  * OS/arch, GPU name & VRAM,
-  * full YAML used (`experiments/h{h}.yaml` merged with `defaults.yaml`).
-* **Locks:** keep `requirements-lock.txt` (from `pip freeze`) beside the manifest. Never “upgrade in place” without a full CV rerun.
-* **Upgrade path:** when bumping Nixtla/torch, **train new models in parallel** under `experiments/h{h}/trial_[date]/` and gate with §12 acceptance criteria before switching.
+  - `python`, `pytorch`, `cuda`, `neuralforecast`, `statsforecast`, `mlforecast`, `hierarchicalforecast` versions,
+  - git commit hash,
+  - OS/arch, GPU name & VRAM,
+  - full YAML used (`experiments/h{h}.yaml` merged with `defaults.yaml`).
+- **Locks:** keep `requirements-lock.txt` (from `pip freeze`) beside the manifest. Never “upgrade in place” without a full CV rerun.
+- **Upgrade path:** when bumping Nixtla/torch, **train new models in parallel** under `experiments/h{h}/trial_[date]/` and gate with §12 acceptance criteria before switching.
 
 **Drop-in:** `utils/versioning.py`
 
@@ -3039,14 +3031,14 @@ def snapshot_env(out_path: str, extra: dict | None = None):
 
 Run **before** any deployment or after any environment change:
 
-* **NF round-trip:** `nf.save(...)` → `NeuralForecast.load(...)` → `predict` on a 3-day slice; assert:
+- **NF round-trip:** `nf.save(...)` → `NeuralForecast.load(...)` → `predict` on a 3-day slice; assert:
 
-  * correct horizon length,
-  * columns present for winner/ensemble (`<alias>`, `<alias>-lo-90`, `<alias>-hi-90`),
-  * no NaNs in the produced horizon (allow NaNs in warmup rows only).
-* **Leakage guard:** re-run `assert_shifted` on a fresh tail build (last 5 days).
-* **Performance sanity:** latency per horizon under **N** seconds (set N per your hardware), peak VRAM below threshold.
-* **Conformal integrity (if used):** re-compute 30-day tail coverage on saved conformalized model; expect **±2pp** at nominal.
+  - correct horizon length,
+  - columns present for winner/ensemble (`<alias>`, `<alias>-lo-90`, `<alias>-hi-90`),
+  - no NaNs in the produced horizon (allow NaNs in warmup rows only).
+- **Leakage guard:** re-run `assert_shifted` on a fresh tail build (last 5 days).
+- **Performance sanity:** latency per horizon under **N** seconds (set N per your hardware), peak VRAM below threshold.
+- **Conformal integrity (if used):** re-compute 30-day tail coverage on saved conformalized model; expect **±2pp** at nominal.
 
 Automate via a tiny script `utils/smoke.py` you call in CI.
 
@@ -3094,10 +3086,10 @@ def coverage_by_vol_decile(preds: pd.DataFrame, vol: pd.Series, model: str, leve
 
 **Live dashboards (minimum):**
 
-* 7-day rolling coverage at 80/90/95 (per horizon).
-* Coverage by volatility decile (weekly).
-* Latency & memory percentiles.
-* PSI for **top-K** hist exogs and for the **target returns** distribution.
+- 7-day rolling coverage at 80/90/95 (per horizon).
+- Coverage by volatility decile (weekly).
+- Latency & memory percentiles.
+- PSI for **top-K** hist exogs and for the **target returns** distribution.
 
 ### 11.5 Retrain procedure (no drama)
 
@@ -3112,32 +3104,32 @@ def coverage_by_vol_decile(preds: pd.DataFrame, vol: pd.Series, model: str, leve
 
 ### 11.6 Rollback (pre-wired, zero doubt)
 
-* Keep the previous best under `experiments/h{h}/prev_best/` with its `version_manifest.json`.
-* If live monitoring breaches **any** §12 gate for >24h, switch back immediately; open a work item to investigate (typical causes: data anomalies, provider glitches, scale drift).
+- Keep the previous best under `experiments/h{h}/prev_best/` with its `version_manifest.json`.
+- If live monitoring breaches **any** §12 gate for >24h, switch back immediately; open a work item to investigate (typical causes: data anomalies, provider glitches, scale drift).
 
 ### 11.7 Optional, tightly-scoped siblings (only where they add value)
 
 **StatsForecast (classical baselines)** — **sanity checks**, not production models.
 
-* Add **Naive**, **SeasonalNaive(96)** (24h/15m), **AutoETS** as “always-on” baselines during CV.
-* Purpose: detect data/feature regressions when NF “wins” but baselines jump.
+- Add **Naive**, **SeasonalNaive(96)** (24h/15m), **AutoETS** as “always-on” baselines during CV.
+- Purpose: detect data/feature regressions when NF “wins” but baselines jump.
 
 **MLForecast (tabular baselines)** — **feature sanity** on the exact same exogs.
 
-* Fit a **Lasso/ElasticNet** or **LightGBM** on a small window to see if crafted exogs have linear signal; if they do not, your indicator stack might be bloated/noisy.
+- Fit a **Lasso/ElasticNet** or **LightGBM** on a small window to see if crafted exogs have linear signal; if they do not, your indicator stack might be bloated/noisy.
 
 **HierarchicalForecast** — **only if** you move to multi-asset or need **temporal reconciliation** across {15m, 30m, 1h, 4h}.
 
-* Keep disabled in single-asset v1. Consider later for coherent MTF forecasts if you must publish them jointly.
+- Keep disabled in single-asset v1. Consider later for coherent MTF forecasts if you must publish them jointly.
 
 > All siblings are **off the critical path**. Use them sparingly for diagnostics and guardrails; your production remains **NeuralForecast-first**.
 
 ### 11.8 House rules (so we don’t regress)
 
-* **Do not** hand-edit exog columns between retrains. Change the **registry**; rerun CV.
-* **One source of truth** for configs: YAML under `experiments/`.
-* **One place** for persistence: `nf.save`/`NeuralForecast.load`. No pickle/torch.save hacks.
-* **Kill complexity** that doesn’t beat your acceptance gates (§12). Stop when gains flatten.
+- **Do not** hand-edit exog columns between retrains. Change the **registry**; rerun CV.
+- **One source of truth** for configs: YAML under `experiments/`.
+- **One place** for persistence: `nf.save`/`NeuralForecast.load`. No pickle/torch.save hacks.
+- **Kill complexity** that doesn’t beat your acceptance gates (§12). Stop when gains flatten.
 
 ---
 
@@ -3167,18 +3159,18 @@ For a candidate **winner** (single model or ENS2) evaluated on the **final CV** 
 
 1. **Accuracy (primary):**
 
-   * **Mean sCRPS** across CV windows ≤ **baseline_sCRPS × 0.985** (≥ **1.5%** improvement).
-   * If dense quantiles weren’t computed in CV, re-run finalists with dense quantiles (e.g., 1–99) to compute sCRPS precisely, then decide.
+   - **Mean sCRPS** across CV windows ≤ **baseline_sCRPS × 0.985** (≥ **1.5%** improvement).
+   - If dense quantiles weren’t computed in CV, re-run finalists with dense quantiles (e.g., 1–99) to compute sCRPS precisely, then decide.
 2. **Calibration:**
 
-   * **Empirical coverage** at **80/90/95** on the **test tail** within **±2 pp** of nominal.
-   * **PIT** on the test tail is roughly uniform (no U-shape/hump; KS or AD test p-value ≥ 0.05 preferred; if not, visual inspection + coverage by volatility decile must not reveal systemic bias).
+   - **Empirical coverage** at **80/90/95** on the **test tail** within **±2 pp** of nominal.
+   - **PIT** on the test tail is roughly uniform (no U-shape/hump; KS or AD test p-value ≥ 0.05 preferred; if not, visual inspection + coverage by volatility decile must not reveal systemic bias).
 3. **Robustness in stress:**
 
-   * In the **top volatility quintile** (by rolling σ of returns), test-tail mean sCRPS degrades by **≤ 10%** vs. overall test-tail sCRPS.
+   - In the **top volatility quintile** (by rolling σ of returns), test-tail mean sCRPS degrades by **≤ 10%** vs. overall test-tail sCRPS.
 4. **Stability:**
 
-   * CV window-to-window **sCRPS std** not worse than baseline by more than **20%** (i.e., don’t accept more variance for tiny mean gains).
+   - CV window-to-window **sCRPS std** not worse than baseline by more than **20%** (i.e., don’t accept more variance for tiny mean gains).
 
 **Baseline definition:** previous production model on the same data slice. Keep **Naive/SeasonalNaive** as sanity checks; you don’t need to beat them by a fixed margin, but if a classical naive ties your deep model, that’s a red flag.
 
@@ -3188,10 +3180,10 @@ For a candidate **winner** (single model or ENS2) evaluated on the **final CV** 
 
 After promotion, **rollback** to prior production if **any** holds for **>24 hours** (or earlier if risk appetite is low):
 
-* Rolling **7-day** coverage at any of {80,90,95} deviates by **>±3 pp**.
-* 7-day mean sCRPS (or MAE proxy) **> +3%** vs. 30-day baseline.
-* Latency or VRAM repeatedly violates SLOs despite batch reductions (§10.4).
-* Data quality issues (missing bars, timestamp drift) persist beyond one cycle.
+- Rolling **7-day** coverage at any of {80,90,95} deviates by **>±3 pp**.
+- 7-day mean sCRPS (or MAE proxy) **> +3%** vs. 30-day baseline.
+- Latency or VRAM repeatedly violates SLOs despite batch reductions (§10.4).
+- Data quality issues (missing bars, timestamp drift) persist beyond one cycle.
 
 ### 12.3 Acceptance report (one command)
 
@@ -3315,17 +3307,17 @@ python reports/acceptance.py \
 
 ### 12.4 What exactly to store
 
-* `experiments/h{h}/acceptance_report.json` — **single source of truth** for ACCEPT/REJECT and rationale.
-* `experiments/h{h}/leaderboard.parquet` — already produced in §9 (keep for audit).
-* `reports/h{h}/preds_*.parquet` — the exact test-tail file used for coverage checks (include filename in the report).
-* If conformal used: `experiments/h{h}/conformal.json` documenting method/levels and empirical deltas.
+- `experiments/h{h}/acceptance_report.json` — **single source of truth** for ACCEPT/REJECT and rationale.
+- `experiments/h{h}/leaderboard.parquet` — already produced in §9 (keep for audit).
+- `reports/h{h}/preds_*.parquet` — the exact test-tail file used for coverage checks (include filename in the report).
+- If conformal used: `experiments/h{h}/conformal.json` documenting method/levels and empirical deltas.
 
 ### 12.5 If it fails — smallest hammer first
 
-* **Coverage miss:** attach **conformal** (per §8.2) and re-evaluate; don’t overfit with large architectural changes.
-* **PIT U-shape:** prefer **quantile training** or RevIN/invariant scaler; reassess features (too many noisy exogs).
-* **Stress degradation:** shorten `input_size` slightly (reduce dependency on stale regimes), tighten feature cap, or drop the heaviest model (PatchTST) if it overfits.
-* **sCRPS barely below threshold (e.g., +1.2%):** verify leaderboard stability; if std across windows is significantly **lower** than baseline and coverage is **clean**, you can accept with a **documented waiver** (don’t make waivers a habit).
+- **Coverage miss:** attach **conformal** (per §8.2) and re-evaluate; don’t overfit with large architectural changes.
+- **PIT U-shape:** prefer **quantile training** or RevIN/invariant scaler; reassess features (too many noisy exogs).
+- **Stress degradation:** shorten `input_size` slightly (reduce dependency on stale regimes), tighten feature cap, or drop the heaviest model (PatchTST) if it overfits.
+- **sCRPS barely below threshold (e.g., +1.2%):** verify leaderboard stability; if std across windows is significantly **lower** than baseline and coverage is **clean**, you can accept with a **documented waiver** (don’t make waivers a habit).
 
 ---
 
@@ -3333,136 +3325,136 @@ python reports/acceptance.py \
 
 ### Phase 0 — Repo scaffold (0.5–1h)
 
-* [ ] **Create directories** **\[P]**
+- [ ] **Create directories** **\[P]**
   `data/`, `features/`, `nf_models/`, `cv/`, `uq/`, `reports/`, `utils/`, `experiments/`
   **Done when:** tree matches plan; CI lints pass.
 
-* [ ] **Stub files** **\[P]**
+- [ ] **Stub files** **\[P]**
 
-  * `utils/io.py`, `utils/validate.py`, `utils/versioning.py`
-  * `features/registry.py`, `features/builder.py`
-  * `nf_models/factories.py`
-  * `cv/runner.py`, `cv/hpo.py`
-  * `uq/diag.py`, `uq/pit.py`, `uq/ensembles.py`, `uq/monitor.py`
-  * `reports/acceptance.py`
-  * `run_train.py`, `run_predict.py`
-  * `experiments/defaults.yaml`, `experiments/h4.yaml`, `experiments/h8.yaml`, `experiments/h16.yaml`, `experiments/h32.yaml`
+  - `utils/io.py`, `utils/validate.py`, `utils/versioning.py`
+  - `features/registry.py`, `features/builder.py`
+  - `nf_models/factories.py`
+  - `cv/runner.py`, `cv/hpo.py`
+  - `uq/diag.py`, `uq/pit.py`, `uq/ensembles.py`, `uq/monitor.py`
+  - `reports/acceptance.py`
+  - `run_train.py`, `run_predict.py`
+  - `experiments/defaults.yaml`, `experiments/h4.yaml`, `experiments/h8.yaml`, `experiments/h16.yaml`, `experiments/h32.yaml`
     **Done when:** all files exist with import-safe stubs.
 
 ### Phase 1 — Data contracts & validation (2–3h)
 
-* [ ] Implement `regularize_to_grid_utc`, `make_nf_canonical`, `drop_train_nans_and_winsorize` in `utils/io.py`.
+- [ ] Implement `regularize_to_grid_utc`, `make_nf_canonical`, `drop_train_nans_and_winsorize` in `utils/io.py`.
   **Done when:** returns long frame with `['unique_id','ds','y',OHLCV...]`, UTC/EOB, deterministic.
 
-* [ ] Implement validators in `utils/validate.py`: `assert_regular_grid`, `assert_utc_eob`, `assert_no_forward_fill_y`, `assert_shifted`.
+- [ ] Implement validators in `utils/validate.py`: `assert_regular_grid`, `assert_utc_eob`, `assert_no_forward_fill_y`, `assert_shifted`.
   **Done when:** each raises on synthetic counterexamples.
 
-* [ ] **Smoke test** notebooks or pytest **\[P]**
+- [ ] **Smoke test** notebooks or pytest **\[P]**
   **Done when:** sample OHLCV → canonical NF frame without asserts firing.
 
 ### Phase 2 — Exogenous features & MTF (3–5h)
 
-* [ ] Implement **registry** in `features/registry.py` (starter set from §3).
+- [ ] Implement **registry** in `features/registry.py` (starter set from §3).
   **Done when:** registry import works; names/params resolve.
 
-* [ ] Implement base-TF compute via vectorbt/TA-Lib + pandas-ta in `features/builder.py` (`build_indicators`).
+- [ ] Implement base-TF compute via vectorbt/TA-Lib + pandas-ta in `features/builder.py` (`build_indicators`).
   **Done when:** produces DataFrame with named columns for each param combo.
 
-* [ ] Implement MTF resample/merge using freqtrade/technical (`apply_mtf`).
+- [ ] Implement MTF resample/merge using freqtrade/technical (`apply_mtf`).
   **Done when:** 30m/1h/4h features EOB-aligned and forward-filled to 15m.
 
-* [ ] Implement postprocess (`postprocess_shift_and_prune`) and selector (`select_features`).
+- [ ] Implement postprocess (`postprocess_shift_and_prune`) and selector (`select_features`).
   **Done when:** all **hist** features are **shift(1)**, availability ≥98%, total ≤256.
 
-* [ ] **Unit checks** **\[P]**:
+- [ ] **Unit checks** **\[P]**:
 
-  * MTF alignment toy example,
-  * leakage check on random timestamps,
-  * cap enforcement.
+  - MTF alignment toy example,
+  - leakage check on random timestamps,
+  - cap enforcement.
     **Done when:** tests pass; printed feature counts ≤256.
 
 ### Phase 3 — NF model factory (1–2h)
 
-* [ ] Implement `nf_models/factories.py` with loss constructors and exog wiring.
+- [ ] Implement `nf_models/factories.py` with loss constructors and exog wiring.
   **Done when:** calling with YAML builds NHITS/NBEATSx/TiDE/PatchTST objects without error.
 
 ### Phase 4 — Experiments config (0.5–1h)
 
-* [ ] Fill `experiments/defaults.yaml` and `experiments/h{h}.yaml` per §9.1.
+- [ ] Fill `experiments/defaults.yaml` and `experiments/h{h}.yaml` per §9.1.
   **Done when:** `yaml.safe_load` shows expected keys/types; models lists parse.
 
 ### Phase 5 — Training driver & CV (2–4h)
 
-* [ ] Implement `run_train.py` (from §9.2).
+- [ ] Implement `run_train.py` (from §9.2).
   **Done when:** on sample data, it: `fit` → `predict_insample` → `cross_validation` and writes:
   `experiments/h{h}/insample.parquet`, `cv_raw.parquet`, `leaderboard.parquet`, `coverage.parquet`.
 
-* [ ] Implement `cv/runner.py::run_cv` and `summarize_cv`.
+- [ ] Implement `cv/runner.py::run_cv` and `summarize_cv`.
   **Done when:** leaderboard has MAE/RMSE and coverage; sCRPS optional until finalists.
 
-* [ ] Optional: enable `--save` to persist NF object (`chkpt/`).
+- [ ] Optional: enable `--save` to persist NF object (`chkpt/`).
   **Done when:** `NeuralForecast.load(chkpt)` → `predict` works.
 
 ### Phase 6 — Pilot → promote → full CV (4–8h compute; 1h ops)
 
-* [ ] **Pilot** h=16, `n_windows=3` using `cv/hpo.py` tiny grids **\[P]** (per-model parallel).
+- [ ] **Pilot** h=16, `n_windows=3` using `cv/hpo.py` tiny grids **\[P]** (per-model parallel).
   **Done when:** `experiments/h16/hpo_leaderboard.parquet` exists; top configs identified.
 
-* [ ] **Promote** best 1–2 per model; rerun h=16 with `n_windows=6`.
+- [ ] **Promote** best 1–2 per model; rerun h=16 with `n_windows=6`.
   **Done when:** updated leaderboard shows clear winners.
 
-* [ ] **Full CV** across h∈{4,8,16,32} with `n_windows=10`, `step_size=h`, `val_size=4*h`.
+- [ ] **Full CV** across h∈{4,8,16,32} with `n_windows=10`, `step_size=h`, `val_size=4*h`.
   **Done when:** per-h leaderboards and coverage written.
 
 ### Phase 7 — Selection & simple ensembling (1–2h)
 
-* [ ] Use §7 rules: pick best single per h; if top-2 tight, create **ENS2** via `uq/ensembles.py` and score with `cv/runner.evaluate_top2_ensemble`.
+- [ ] Use §7 rules: pick best single per h; if top-2 tight, create **ENS2** via `uq/ensembles.py` and score with `cv/runner.evaluate_top2_ensemble`.
   **Done when:** `experiments/h{h}/selection.json` saved; winner decided.
 
-* [ ] Final **fit** of winner(s) on all data (keep `val_size` for early stop) and `nf.save(...)`.
+- [ ] Final **fit** of winner(s) on all data (keep `val_size` for early stop) and `nf.save(...)`.
   **Done when:** `experiments/h{h}/best/` (or two member dirs) exist; load/predict OK.
 
 ### Phase 8 — Uncertainty & calibration (1–2h)
 
-* [ ] Compute **coverage** tables and **PIT** for finalists (dense quantiles if needed).
+- [ ] Compute **coverage** tables and **PIT** for finalists (dense quantiles if needed).
   **Done when:** `experiments/h{h}/pit_hist.png` and `coverage.parquet` updated.
 
-* [ ] If coverage miss >±2pp, attach **Conformal** (per §8.2) and re-evaluate.
+- [ ] If coverage miss >±2pp, attach **Conformal** (per §8.2) and re-evaluate.
   **Done when:** coverage on validation tail is within band.
 
 ### Phase 9 — Inference & live loop (2–3h)
 
-* [ ] Implement `utils/tail_build.py` and wire `run_predict.py` (single-shot + `--loop`).
+- [ ] Implement `utils/tail_build.py` and wire `run_predict.py` (single-shot + `--loop`).
   **Done when:** `run_predict.py --exp experiments/h16.yaml --model_path experiments/h16/best/ --h 16`
   writes `reports/h16/preds_*.parquet`.
 
-* [ ] If **ENS2**: add tiny wrapper to load two saved NF objects and blend predictions post-predict.
+- [ ] If **ENS2**: add tiny wrapper to load two saved NF objects and blend predictions post-predict.
   **Done when:** `ENS2` columns appear in preds, with intervals averaged level-wise.
 
 ### Phase 10 — Monitoring & maintenance (1–2h)
 
-* [ ] Implement `uq/monitor.py` (rolling coverage, PSI, vol-decile coverage) and `utils/versioning.snapshot_env`.
+- [ ] Implement `uq/monitor.py` (rolling coverage, PSI, vol-decile coverage) and `utils/versioning.snapshot_env`.
   **Done when:** daily job produces CSV/PNG artifacts in `reports/monitoring/`.
 
-* [ ] **Smoke tests** script in `utils/smoke.py`.
+- [ ] **Smoke tests** script in `utils/smoke.py`.
   **Done when:** pass on fresh environment; round-trip save/load/predict OK.
 
 ### Phase 11 — Acceptance & promotion (0.5–1h)
 
-* [ ] Run `reports/acceptance.py` per h with baseline sCRPS.
+- [ ] Run `reports/acceptance.py` per h with baseline sCRPS.
   **Done when:** `experiments/h{h}/acceptance_report.json` says **ACCEPT**.
 
-* [ ] **Promote** by switching deploy config `model_path` to `experiments/h{h}/best/`. Keep previous under `prev_best/` for rollback.
+- [ ] **Promote** by switching deploy config `model_path` to `experiments/h{h}/best/`. Keep previous under `prev_best/` for rollback.
   **Done when:** live loop producing forecasts at the next EOB; monitoring green.
 
 ---
 
 ### Parallelization guide (practical)
 
-* **\[P] Phase 1 vs. Phase 2:** data validators and feature builders can be developed/tested independently on stub data.
-* **\[P] Phase 3–4:** model factory & YAML can proceed while features stabilize (use a tiny placeholder exog set).
-* **\[P] Phase 6:** per-model pilot CV runs in parallel (separate processes/GPUs).
-* **\[P] Phase 9:** inference loop wiring can start once a single trained checkpoint exists (no need to wait for full CV).
+- **\[P] Phase 1 vs. Phase 2:** data validators and feature builders can be developed/tested independently on stub data.
+- **\[P] Phase 3–4:** model factory & YAML can proceed while features stabilize (use a tiny placeholder exog set).
+- **\[P] Phase 6:** per-model pilot CV runs in parallel (separate processes/GPUs).
+- **\[P] Phase 9:** inference loop wiring can start once a single trained checkpoint exists (no need to wait for full CV).
 
 ---
 
@@ -3494,7 +3486,7 @@ python reports/acceptance.py --hdir experiments/h16 --winner ENS2 --baseline_scr
 
 ### Definition of Done (v1)
 
-* Reproducible CV artifacts per horizon; winners saved via **NF `save`**; inference loop producing **point + 80/90/95 PIs** every 15 minutes; acceptance report **ACCEPT** for ≥2 horizons, none **REJECT**; monitoring shows 7-day coverage within **±3pp**, latency within SLO, and PSI ≤0.2.
+- Reproducible CV artifacts per horizon; winners saved via **NF `save`**; inference loop producing **point + 80/90/95 PIs** every 15 minutes; acceptance report **ACCEPT** for ≥2 horizons, none **REJECT**; monitoring shows 7-day coverage within **±3pp**, latency within SLO, and PSI ≤0.2.
 
 ---
 
@@ -3502,172 +3494,168 @@ python reports/acceptance.py --hdir experiments/h16 --winner ENS2 --baseline_scr
 
 Even with this careful plan, things can go wrong. We enumerate some potential issues and how we address them:
 
-* **Feature leakage:** The biggest risk in time series. If we accidentally use a non-shifted feature or include future info in hist_exog, the backtest will look artificially good. **Mitigation:** Our assert_shifted check will verify that for each hist_exog column, corr(feature, y_lead_1) is zero (there should be no direct correlation with future target). We only populate futr_exog with truly future-known info.
+- **Feature leakage:** The biggest risk in time series. If we accidentally use a non-shifted feature or include future info in hist_exog, the backtest will look artificially good. **Mitigation:** Our assert_shifted check will verify that for each hist_exog column, corr(feature, y_lead_1) is zero (there should be no direct correlation with future target). We only populate futr_exog with truly future-known info.
 
-* **Misaligned MTF features:** If resampling isn’t done correctly, e.g., using left-closed intervals instead of right-closed, we could use future info. We explicitly use the end-of-bar labeling (right label) when resampling and then shift. We will test by printing a few samples: e.g., a 1h moving average at 10:00 should be computed from data up to 9:00-10:00 and after shift, the 10:15 row uses the 9:00-10:00 MA – that’s correct.
+- **Misaligned MTF features:** If resampling isn’t done correctly, e.g., using left-closed intervals instead of right-closed, we could use future info. We explicitly use the end-of-bar labeling (right label) when resampling and then shift. We will test by printing a few samples: e.g., a 1h moving average at 10:00 should be computed from data up to 9:00-10:00 and after shift, the 10:15 row uses the 9:00-10:00 MA – that’s correct.
 
-* **Quantile crossing:** If using quantile loss without special handling, it’s possible the predicted 90th percentile is lower than 50th. NF’s ISQF or IQLoss should handle a lot of this, but if we see any minor violations, we can sort the outputs after the fact (monotonic enforcement) or switch to the implicit quantile approach.
+- **Quantile crossing:** If using quantile loss without special handling, it’s possible the predicted 90th percentile is lower than 50th. NF’s ISQF or IQLoss should handle a lot of this, but if we see any minor violations, we can sort the outputs after the fact (monotonic enforcement) or switch to the implicit quantile approach.
 
-* **Overfitting to backtest (over-engineering):** With so many features, there’s a risk we overfit the historical test. Mitigation: keep feature set moderate, use regularization (dropout, etc.), and trust cross-validation with refit – because refit simulates how model sees new data it wasn’t trained on each fold, it gives a more honest measure. We also can hold out the latest chunk of data entirely as an unseen test to double-check.
+- **Overfitting to backtest (over-engineering):** With so many features, there’s a risk we overfit the historical test. Mitigation: keep feature set moderate, use regularization (dropout, etc.), and trust cross-validation with refit – because refit simulates how model sees new data it wasn’t trained on each fold, it gives a more honest measure. We also can hold out the latest chunk of data entirely as an unseen test to double-check.
 
-* **Underestimating tails (under-coverage):** If even Student-T models underestimate some extreme moves, our 95% interval might actually be, say, 80%. Mitigation: conformal will catch this by widening intervals based on residuals. If we still see under-coverage, consider using an even heavier-tail distribution (NF supports Negative Binomial or a mixture if needed) or add features that correlate with those jumps (like including stock market volatility index if BTC spikes align with that, etc.).
+- **Underestimating tails (under-coverage):** If even Student-T models underestimate some extreme moves, our 95% interval might actually be, say, 80%. Mitigation: conformal will catch this by widening intervals based on residuals. If we still see under-coverage, consider using an even heavier-tail distribution (NF supports Negative Binomial or a mixture if needed) or add features that correlate with those jumps (like including stock market volatility index if BTC spikes align with that, etc.).
 
-* **Data issues:** e.g., a big price feed error (spike) that isn’t real – our model might learn a weird behavior. Mitigation: use the winsorization and maybe remove obviously bad data points from training (treat as missing).
+- **Data issues:** e.g., a big price feed error (spike) that isn’t real – our model might learn a weird behavior. Mitigation: use the winsorization and maybe remove obviously bad data points from training (treat as missing).
 
-* **GPU OOM (out-of-memory):** PatchTST with large input and batch might OOM on a GPU if memory is limited. We already plan to reduce batch_size if needed. We could also decrease windows_batch_size (NF uses this to sub-sample windows per batch). If still an issue, we drop PatchTST or run it on CPU with smaller batch since CPU memory is usually larger (with a speed hit).
+- **GPU OOM (out-of-memory):** PatchTST with large input and batch might OOM on a GPU if memory is limited. We already plan to reduce batch_size if needed. We could also decrease windows_batch_size (NF uses this to sub-sample windows per batch). If still an issue, we drop PatchTST or run it on CPU with smaller batch since CPU memory is usually larger (with a speed hit).
 
-* **Library bugs or updates:** Relying on NF means we’re subject to its bugs. We saw some GitHub issues about predict_insample bugs, etc. We will keep an eye on Nixtla’s GitHub for any relevant issues. If a critical bug is found (e.g., in a model or loss), we might need to update to a patched version or implement a workaround. Pinning a stable version (like neuralforecast==1.x.y) is important.
+- **Library bugs or updates:** Relying on NF means we’re subject to its bugs. We saw some GitHub issues about predict_insample bugs, etc. We will keep an eye on Nixtla’s GitHub for any relevant issues. If a critical bug is found (e.g., in a model or loss), we might need to update to a patched version or implement a workaround. Pinning a stable version (like neuralforecast==1.x.y) is important.
 
-* **Interpretability/Trust:** Stakeholders might ask why the model is forecasting what it is. NBEATSx offers some interpretability (trend/seasonality decomposition). We can provide partial plots or indicator importance by analyzing the learned weights or doing ablation (e.g., turn off one feature and see effect). Not a risk per se, but something to be ready to address by logs or visualizations.
+- **Interpretability/Trust:** Stakeholders might ask why the model is forecasting what it is. NBEATSx offers some interpretability (trend/seasonality decomposition). We can provide partial plots or indicator importance by analyzing the learned weights or doing ablation (e.g., turn off one feature and see effect). Not a risk per se, but something to be ready to address by logs or visualizations.
 
-* **Integration with upstream/downstream:** Ensure our 15-min UTC timestamps align exactly with the data source’s timing. Any off-by-one issues would break the live use. We’ve set end-of-bar labeling to avoid confusion. We’ll coordinate with data engineers to confirm that the bar at 12:00 contains trades up to 12:00, etc.
+- **Integration with upstream/downstream:** Ensure our 15-min UTC timestamps align exactly with the data source’s timing. Any off-by-one issues would break the live use. We’ve set end-of-bar labeling to avoid confusion. We’ll coordinate with data engineers to confirm that the bar at 12:00 contains trades up to 12:00, etc.
 
 By anticipating these, we include checks and flexibility to respond. For example, if we detect poor coverage in a certain regime, we can quickly adjust via conformal or add a feature (like realized volatility) and retrain.
 
-**Short answer:** Append my blocks **after** your existing text. Don’t delete anything unless I say “replace/overwrite.”
-Context is intact — no need to resend the plan.
-
-
 ### 14.1 MTF misalignment (30m/1h/4h → 15m)
 
-* **Symptom:** Feature jumps occur at wrong minutes; coverage/PIT skewed on hour boundaries.
-* **Cause:** Higher-TF bars not EOB-aligned or not forward-filled correctly, or not shifted.
-* **Fix (exact):**
+- **Symptom:** Feature jumps occur at wrong minutes; coverage/PIT skewed on hour boundaries.
+- **Cause:** Higher-TF bars not EOB-aligned or not forward-filled correctly, or not shifted.
+- **Fix (exact):**
 
-  * Use `apply_mtf()` from §3 (freqtrade/technical merge). Do **not** write custom `resample()` logic.
-  * Keep **EOB UTC** grid (§2).
-  * Central **`shift(1)`** in `postprocess_shift_and_prune()` — never compute or shift ad hoc.
-  * Add unit test: fabricate a 2-hour toy series; assert 1h feature is constant within each hour and only updates at `:00` **and** that the final matrix is shifted by one 15-min step.
+  - Use `apply_mtf()` from §3 (freqtrade/technical merge). Do **not** write custom `resample()` logic.
+  - Keep **EOB UTC** grid (§2).
+  - Central **`shift(1)`** in `postprocess_shift_and_prune()` — never compute or shift ad hoc.
+  - Add unit test: fabricate a 2-hour toy series; assert 1h feature is constant within each hour and only updates at `:00` **and** that the final matrix is shifted by one 15-min step.
 
 ### 14.2 Leakage from non-shifted historic exogs
 
-* **Symptom:** Unrealistically good CV; live collapses.
-* **Cause:** Any historic indicator not `shift(1)` after MTF merge; “future” calendar accidentally placed in `hist_exog_list`.
-* **Fix (exact):**
+- **Symptom:** Unrealistically good CV; live collapses.
+- **Cause:** Any historic indicator not `shift(1)` after MTF merge; “future” calendar accidentally placed in `hist_exog_list`.
+- **Fix (exact):**
 
-  * Enforce `assert_shifted(nf_df, hist_cols)` after merge (Section 2).
-  * Keep **all** calendar features (`minute_of_day`, `day_of_week`, `is_weekend`) strictly in `futr_exog_list`.
-  * Make `postprocess_shift_and_prune()` the **only** place allowed to shift; code-review PRs against this.
+  - Enforce `assert_shifted(nf_df, hist_cols)` after merge (Section 2).
+  - Keep **all** calendar features (`minute_of_day`, `day_of_week`, `is_weekend`) strictly in `futr_exog_list`.
+  - Make `postprocess_shift_and_prune()` the **only** place allowed to shift; code-review PRs against this.
 
 ### 14.3 Target mishandling (log-returns)
 
-* **Symptom:** NaNs/inf in `y`, or returns computed on forward-filled prices.
-* **Cause:** Missing bars filled before return calc; non-UTC timestamps causing duplicate bars.
-* **Fix (exact):**
+- **Symptom:** NaNs/inf in `y`, or returns computed on forward-filled prices.
+- **Cause:** Missing bars filled before return calc; non-UTC timestamps causing duplicate bars.
+- **Fix (exact):**
 
-  * Build `y = log(close).diff()` **after** `regularize_to_grid_utc()` and before any imputation on OHLCV.
-  * `assert_no_forward_fill_y()` (Section 2).
-  * Drop rows where `close` is NaN **before** training; never impute `y`.
+  - Build `y = log(close).diff()` **after** `regularize_to_grid_utc()` and before any imputation on OHLCV.
+  - `assert_no_forward_fill_y()` (Section 2).
+  - Drop rows where `close` is NaN **before** training; never impute `y`.
 
 ### 14.4 Quantile crossing / bad calibration
 
-* **Symptom:** `q90 < q80` or PIT U-shape/coverage misses.
-* **Cause:** No monotonic quantile constraint; heavy tails.
-* **Fix (exact):**
+- **Symptom:** `q90 < q80` or PIT U-shape/coverage misses.
+- **Cause:** No monotonic quantile constraint; heavy tails.
+- **Fix (exact):**
 
-  * Switch `loss: {kind: iqloss}` (ISQF) for quantile runs **or** keep MQ and attach **Conformal** (§8.2).
-  * Use **StudentT** for distributional runs; request `level=[80,90,95]` and attach conformal only if coverage is off by >±2pp.
+  - Switch `loss: {kind: iqloss}` (ISQF) for quantile runs **or** keep MQ and attach **Conformal** (§8.2).
+  - Use **StudentT** for distributional runs; request `level=[80,90,95]` and attach conformal only if coverage is off by >±2pp.
 
 ### 14.5 GPU OOM / slow inference
 
-* **Symptom:** OOM during training/predict; inference > latency SLO.
-* **Cause:** PatchTST context too long, batch too large, hidden sizes too big.
-* **Fix (exact):**
+- **Symptom:** OOM during training/predict; inference > latency SLO.
+- **Cause:** PatchTST context too long, batch too large, hidden sizes too big.
+- **Fix (exact):**
 
-  * **Training:** lower `batch_size` → reduce `hidden_size`/`n_heads` (PatchTST) → shorten `input_size`.
-  * **Inference:** set `torch.set_grad_enabled(False)` (already in §10), reduce `batch_size` if exposed; drop PatchTST first; keep NHITS/NBEATSx.
-  * Keep feature cap ≤ **256** (§3).
+  - **Training:** lower `batch_size` → reduce `hidden_size`/`n_heads` (PatchTST) → shorten `input_size`.
+  - **Inference:** set `torch.set_grad_enabled(False)` (already in §10), reduce `batch_size` if exposed; drop PatchTST first; keep NHITS/NBEATSx.
+  - Keep feature cap ≤ **256** (§3).
 
 ### 14.6 Training instability (loss spikes/NaNs)
 
-* **Symptom:** Divergence mid-epoch; NaNs in weights/loss.
-* **Cause:** Too high LR; unbounded outliers; numeric issues in indicators.
-* **Fix (exact):**
+- **Symptom:** Divergence mid-epoch; NaNs in weights/loss.
+- **Cause:** Too high LR; unbounded outliers; numeric issues in indicators.
+- **Fix (exact):**
 
-  * Lower `learning_rate` one notch (1e-3 → 5e-4 or 1e-4 for PatchTST).
-  * Ensure **winsorization** of `y_train` on training-only copy (§2).
-  * Drop obviously broken features (near-constant, NaN-prone) via existing availability/variance pruner.
+  - Lower `learning_rate` one notch (1e-3 → 5e-4 or 1e-4 for PatchTST).
+  - Ensure **winsorization** of `y_train` on training-only copy (§2).
+  - Drop obviously broken features (near-constant, NaN-prone) via existing availability/variance pruner.
 
 ### 14.7 Bad data (gaps/dupes/tz drift)
 
-* **Symptom:** CV window sizes inconsistent; duplicate timestamps; sudden coverage collapse.
-* **Cause:** Provider anomalies; daylight-savings/tz mislabels (should not happen in UTC, but verify).
-* **Fix (exact):**
+- **Symptom:** CV window sizes inconsistent; duplicate timestamps; sudden coverage collapse.
+- **Cause:** Provider anomalies; daylight-savings/tz mislabels (should not happen in UTC, but verify).
+- **Fix (exact):**
 
-  * `assert_regular_grid(df,"15min")`, `assert_utc_eob(df,"15min")` on every run.
-  * If last bar is missing/partial, **skip the cycle** (don’t fabricate bars).
-  * Keep a data-provenance log (counts of bars/day, %missing) in `reports/monitoring/`.
+  - `assert_regular_grid(df,"15min")`, `assert_utc_eob(df,"15min")` on every run.
+  - If last bar is missing/partial, **skip the cycle** (don’t fabricate bars).
+  - Keep a data-provenance log (counts of bars/day, %missing) in `reports/monitoring/`.
 
 ### 14.8 sCRPS not computed / misleading leaderboard
 
-* **Symptom:** Leaderboard ranks by MAE only; promotion ambiguous.
-* **Cause:** You didn’t request dense quantiles.
-* **Fix (exact):**
+- **Symptom:** Leaderboard ranks by MAE only; promotion ambiguous.
+- **Cause:** You didn’t request dense quantiles.
+- **Fix (exact):**
 
-  * For **finalists only**, re-run CV with `quantiles=[0.01,...,0.99]` and compute sCRPS using NF’s metric (already wired in §9/§12). Stop after selection.
+  - For **finalists only**, re-run CV with `quantiles=[0.01,...,0.99]` and compute sCRPS using NF’s metric (already wired in §9/§12). Stop after selection.
 
 ### 14.9 Ensemble miscalibration
 
-* **Symptom:** Equal-weight blend widens/narrows intervals inconsistently; coverage drifts.
-* **Cause:** Averaging parameters or mixing interval definitions.
-* **Fix (exact):**
+- **Symptom:** Equal-weight blend widens/narrows intervals inconsistently; coverage drifts.
+- **Cause:** Averaging parameters or mixing interval definitions.
+- **Fix (exact):**
 
-  * **Never** average distribution parameters. Always blend **point** and **quantiles/intervals** level-wise (Section 7).
-  * If still under-covered, attach **conformal** post-ensemble and re-check coverage.
+  - **Never** average distribution parameters. Always blend **point** and **quantiles/intervals** level-wise (Section 7).
+  - If still under-covered, attach **conformal** post-ensemble and re-check coverage.
 
 ### 14.10 Save/Load & version drift
 
-* **Symptom:** Loaded model predicts differently vs. pre-save; runtime errors after upgrades.
-* **Cause:** Unpinned versions; changed NF/torch defaults.
-* **Fix (exact):**
+- **Symptom:** Loaded model predicts differently vs. pre-save; runtime errors after upgrades.
+- **Cause:** Unpinned versions; changed NF/torch defaults.
+- **Fix (exact):**
 
-  * Always `nf.save(path, save_dataset=True)` and `NeuralForecast.load(path)`.
-  * Snapshot `version_manifest.json` + `requirements-lock.txt` (§11).
-  * On any upgrade, **parallel-train** under `trial_*/` and gate with §12 before promotion.
+  - Always `nf.save(path, save_dataset=True)` and `NeuralForecast.load(path)`.
+  - Snapshot `version_manifest.json` + `requirements-lock.txt` (§11).
+  - On any upgrade, **parallel-train** under `trial_*/` and gate with §12 before promotion.
 
 ### 14.11 Timezone or calendar mistakes
 
-* **Symptom:** Calendar `futr_exog` off by one bar; weekend flags mismatched.
-* **Cause:** Non-UTC base; wrong EOB assumption.
-* **Fix (exact):**
+- **Symptom:** Calendar `futr_exog` off by one bar; weekend flags mismatched.
+- **Cause:** Non-UTC base; wrong EOB assumption.
+- **Fix (exact):**
 
-  * Force **UTC** from ingest; rebuild calendars from UTC `ds` only (Section 3 custom funcs).
-  * Add a smoke test that checks known UTC boundaries (e.g., Monday 00:00 UTC transitions).
+  - Force **UTC** from ingest; rebuild calendars from UTC `ds` only (Section 3 custom funcs).
+  - Add a smoke test that checks known UTC boundaries (e.g., Monday 00:00 UTC transitions).
 
 ### 14.12 Overfitting via feature bloat
 
-* **Symptom:** Great train fit; CV/test sCRPS flat or worse; unstable coverage.
-* **Cause:** Too many correlated indicators; weak MTF features.
-* **Fix (exact):**
+- **Symptom:** Great train fit; CV/test sCRPS flat or worse; unstable coverage.
+- **Cause:** Too many correlated indicators; weak MTF features.
+- **Fix (exact):**
 
-  * Keep **≤256** features; prune |Spearman| ≥ 0.95 (§3).
-  * Prefer small, well-chosen sets; delete features that don’t move sCRPS ≥ 0.5–1% in ablations.
+  - Keep **≤256** features; prune |Spearman| ≥ 0.95 (§3).
+  - Prefer small, well-chosen sets; delete features that don’t move sCRPS ≥ 0.5–1% in ablations.
 
 ### 14.13 Horizon mismatch / empty predictions
 
-* **Symptom:** `predict` returns fewer than `h` rows.
-* **Cause:** Missing future rows or calendar futr_exogs.
-* **Fix (exact):**
+- **Symptom:** `predict` returns fewer than `h` rows.
+- **Cause:** Missing future rows or calendar futr_exogs.
+- **Fix (exact):**
 
-  * Use `build_future_calendar(last_ds, h)` (§10) and pass via `predict(..., futr_df=...)`.
-  * Verify `len(futr_df) == h` and required columns exist before calling `predict`.
+  - Use `build_future_calendar(last_ds, h)` (§10) and pass via `predict(..., futr_df=...)`.
+  - Verify `len(futr_df) == h` and required columns exist before calling `predict`.
 
 ### 14.14 Live loop race conditions
 
-* **Symptom:** Occasionally predicting on partial last bar.
-* **Cause:** Triggering exactly at EOB with no buffer.
-* **Fix (exact):**
+- **Symptom:** Occasionally predicting on partial last bar.
+- **Cause:** Triggering exactly at EOB with no buffer.
+- **Fix (exact):**
 
-  * In `run_predict.py --loop`, keep `--buffer_sec` ≥ **45s**.
-  * If your data source lags, consider 90s. Skip cycle if bar isn’t final.
+  - In `run_predict.py --loop`, keep `--buffer_sec` ≥ **45s**.
+  - If your data source lags, consider 90s. Skip cycle if bar isn’t final.
 
 ### 14.15 Regression after “harmless” refactors
 
-* **Symptom:** Same configs, worse results.
-* **Cause:** Silent changes in registry, YAML, or scaler settings.
-* **Fix (exact):**
+- **Symptom:** Same configs, worse results.
+- **Cause:** Silent changes in registry, YAML, or scaler settings.
+- **Fix (exact):**
 
-  * CI: run `utils/smoke.py` + a mini-CV (1 window) on a fixed slice for **snapshot parity** before merging.
-  * Require PRs to include updated `version_manifest.json` if deps moved.
+  - CI: run `utils/smoke.py` + a mini-CV (1 window) on a fixed slice for **snapshot parity** before merging.
+  - Require PRs to include updated `version_manifest.json` if deps moved.
 
 ---

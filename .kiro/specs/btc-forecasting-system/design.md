@@ -22,12 +22,14 @@ graph TB
     H --> I[Inference Engine]
     I --> J[Monitoring & Alerting]
     
-    K[YAML Configs] --> D
+    K[YAML Configs (experiments/*.yaml)] --> D
     K --> E
-    L[Registry] --> C
-    M[Validation Rules] --> B
-    N[Quality Gates] --> F
+    L[Feature Registry] --> C
+    M[Validation Rules (utils/validate.py)] --> B
+    N[Quality Gates (§12)] --> F
 ```
+
+Caption: End-to-end data and model flow aligned to plan §§1–10.
 
 ### Data Flow Architecture
 
@@ -45,6 +47,8 @@ graph LR
     J --> K[Inference Pipeline]
 ```
 
+Caption: Feature pipeline with compute → align → shift(1) per plan §3.
+
 ### Module Dependency Graph
 
 ```mermaid
@@ -60,6 +64,8 @@ graph TD
     J[experiments/*.yaml] --> H
     J --> I
 ```
+
+Caption: Module dependencies and entrypoints per repo scaffold (§1.1, §1.7).
 
 ## Components and Interfaces
 
@@ -94,7 +100,8 @@ graph TD
 ```python
 # Grid validation: ds.is_monotonic_increasing and complete 15min grid
 # EOB validation: all timestamps align to :00, :15, :30, :45
-# Leakage detection: corr(exog_t, y_t) < corr(exog_t, y_{t+1})
+# Optional leakage diagnostic: corr(exog_t, y_t) < corr(exog_t, y_{t+1})
+# (Hard gates remain: assert_regular_grid, assert_utc_eob, assert_no_forward_fill_y, assert_shifted)
 ```
 
 ### Feature Engineering Components
@@ -170,6 +177,7 @@ REGISTRY = {
 # Non-overlapping: step_size=h
 # Validation size: val_size=4*h
 # Always refit=True for realistic evaluation
+# Conformal config: prediction_intervals=PredictionIntervals(n_windows=6), level=[80, 90, 95]
 ```
 
 ### Uncertainty Quantification Components
@@ -235,9 +243,9 @@ REGISTRY = {
     "low": float,
     "close": float,
     "volume": float,
-    # ... hist_exog features (shifted by 1)
-    # ... futr_exog features (calendar)
-    # ... stat_exog features (if any)
+    # hist_*: float,  # historic exogs, all shifted by 1
+    # futr_*: float,  # future-known exogs (calendar), unshifted
+    # stat_*: float,  # static exogs (entity-level)
 }
 ```
 
@@ -389,8 +397,8 @@ class LeakageDetectionError(Exception):
 # Artifact storage:
 # - experiments/h{h}/cv_results.parquet
 # - experiments/h{h}/metrics.csv
-# - experiments/h{h}/best/ (model saves)
-# - reports/h{h}/ (diagnostics)
+# - experiments/h{h}/best/  # nf.save(..., save_dataset=True)
+# - reports/h{h}/  # diagnostics, preds, plots
 ```
 
 ### Production Inference Environment

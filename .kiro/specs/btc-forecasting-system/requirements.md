@@ -34,7 +34,7 @@ This document outlines the requirements for implementing a comprehensive BTC int
 4. WHEN filtering features THEN the system SHALL require availability ≥98% and drop features with insufficient data coverage
 5. WHEN processing historical exogenous features THEN the system SHALL shift all features by one bar before joining with target using postprocess_shift_and_prune
 6. WHEN handling future-known features THEN the system SHALL properly categorize calendar features (minute_of_day, day_of_week, is_weekend) as futr_exog_list for NF models
-7. WHEN validating feature quality THEN the system SHALL ensure hist_exog shows corr(exog_t, y_t) < corr(exog_t, y_{t+1}) as leakage check
+7. WHEN validating feature quality THEN the system SHOULD include an optional diagnostic: hist_exog shows corr(exog_t, y_t) < corr(exog_t, y_{t+1}); hard gates remain the assert_* validators
 
 ### Requirement 3: Model Training and Cross-Validation
 
@@ -66,6 +66,7 @@ This document outlines the requirements for implementing a comprehensive BTC int
 5. WHEN detecting miscalibration THEN the system SHALL trigger conformal adjustment before deployment
 6. WHEN using conformal prediction THEN the system SHALL implement PredictionIntervals(n_windows=cfg["n_windows"], level=[80,90,95]) for CV-based conformal
 7. WHEN evaluating probabilistic performance THEN the system SHALL compute dense quantiles [0.01,...,0.99] for sCRPS calculation on finalists only
+8. WHEN persisting artifacts THEN the system SHALL store CV outputs and diagnostics under stable paths per plan: experiments/h{h}/ and reports/h{h}/
 
 ### Requirement 5: Model Selection and Ensembling
 
@@ -78,6 +79,7 @@ This document outlines the requirements for implementing a comprehensive BTC int
 3. WHEN blending predictions THEN the system SHALL average point forecasts and quantiles separately, never distribution parameters
 4. WHEN promoting models THEN the system SHALL require sCRPS improvement ≥1% over baseline for selection
 5. WHEN saving ensembles THEN the system SHALL persist individual models and blending metadata separately
+6. WHEN storing ensemble metadata THEN the system SHALL save a minimal JSON (model_names, weights, horizon, timestamp) under experiments/h{h}/best/ensemble.json
 
 ### Requirement 6: Hyperparameter Optimization
 
@@ -101,9 +103,10 @@ This document outlines the requirements for implementing a comprehensive BTC int
 2. WHEN structuring YAML configs THEN the system SHALL include required keys: h, n_windows, step_size, val_size, refit, models list with loss specifications
 3. WHEN running training THEN the system SHALL execute via run_train.py with NF-native fit and cross_validation
 4. WHEN generating diagnostics THEN the system SHALL produce insample predictions for PIT analysis and coverage validation
-5. WHEN saving artifacts THEN the system SHALL use NF's native save/load with save_dataset=True and overwrite=True
-6. WHEN organizing outputs THEN the system SHALL maintain consistent directory structure under experiments/h{h}/ with cv_results.parquet, metrics.csv, best/
-7. WHEN implementing run_train.py THEN the system SHALL orchestrate: load canonical frame → build features → instantiate NF models → cross_validation → metrics/plots → optional final fit → save artifacts
+5. WHEN invoking training THEN the system SHALL call assert_regular_grid, assert_utc_eob, assert_no_forward_fill_y, and assert_shifted prior to NF.fit/cross_validation
+6. WHEN saving artifacts THEN the system SHALL use NF's native save/load with save_dataset=True and overwrite=True
+7. WHEN organizing outputs THEN the system SHALL maintain consistent directory structure under experiments/h{h}/ with cv_results.parquet, metrics.csv, best/
+8. WHEN implementing run_train.py THEN the system SHALL orchestrate: load canonical frame → build features → instantiate NF models → cross_validation (with PredictionIntervals, level=[80,90,95]) → metrics/plots → optional final fit → save artifacts
 
 ### Requirement 8: Inference and Deployment
 
@@ -208,5 +211,5 @@ This document outlines the requirements for implementing a comprehensive BTC int
 3. WHEN validating stability THEN the system SHALL ensure consistent performance across CV windows
 4. WHEN generating reports THEN the system SHALL produce comprehensive acceptance reports with all key metrics
 5. WHEN failing quality gates THEN the system SHALL provide clear guidance on remediation steps
-6. WHEN enforcing guardrails THEN the system SHALL validate that hist_exog shows corr(exog_t, y_t) < corr(exog_t, y_{t+1}) as leakage check
+6. WHEN enforcing guardrails THEN the system SHOULD include the correlation-based leakage diagnostic (optional, non-blocking); blocking gates are assert_regular_grid, assert_utc_eob, assert_no_forward_fill_y, assert_shifted
 7. WHEN achieving definition of done THEN the system SHALL deliver reproducible CV artifacts, saved winners, 15-min inference loop with 80/90/95 PIs, acceptance reports, and monitoring within ±3pp coverage
