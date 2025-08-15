@@ -785,7 +785,7 @@ assert_no_forward_fill_y(nf_base)
 
 Incorporating exogenous features is crucial for intraday BTC. We’ll use a layered approach:
 
-**Primary libraries for features:** - **vectorbt \+ TA-Lib:** for fast, vectorized technical indicators calculated over the full series (leveraging TA-Lib’s C implementations under the hood). Vectorbt can wrap TA-Lib functions to produce indicator arrays efficiently. - **pandas-ta (OpenBB fork):** a pure Python (Numba-accelerated) technical analysis library. It offers a wide range of indicators and can fill gaps where TA-Lib or vectorbt might not have a specific indicator or flexibility. - **Freqtrade’s technical library:** specifically for multi-timeframe features. It provides utilities like resample_to_interval and resampled_merge to compute higher timeframe indicators and merge them into a base timeframe DataFrame in a forward-filled manner. This is safer and more convenient than manual Pandas merging, as it renames columns to avoid collision and ensures alignment.
+**Primary libraries for features:** - **vectorbt \+ TA-Lib:** for fast, vectorized technical indicators calculated over the full series (leveraging TA-Lib’s C implementations under the hood). Vectorbt can wrap TA-Lib functions to produce indicator arrays efficiently. - **pandas-ta (OpenBB fork):** a pure Python (Numba-accelerated) technical analysis library. It offers a wide range of indicators and can fill gaps where TA-Lib or vectorbt might not have a specific indicator or flexibility. - **Freqtrade’s technical library:** specifically for multi-timeframe features. It provides utilities like resample_to_interval and resampled_merge to compute higher timeframe indicators and merge them into a base timeframe DataFrame in a forward-filled manner. This is safer and more convenient than manual Pandas merging, as it renames columns to avoid collision and ensures alignment. - **Crypto-specific data sources:** exchange APIs (via CCXT or native REST/WebSocket) for funding rates, open interest, and spot–perp basis; and order book streams (e.g., cryptofeed) for imbalance/spread/depth metrics. These are data feeds (not TA libs). We compute features ourselves, then strictly compute → align to 15m EOB → shift(1).
 
 We categorize exogenous features by how they align with the target: - **Historic exogenous (hist_exog_list):** features that are fully known up to the current time *and cannot peek into the future*. These might be technical indicators derived from past prices/volume. In NF, we will pass their column names via hist_exog_list so the models know these are only available historically. We will rigorously apply shift(1) to these features after computation, so that at time *t*, the feature value comes from data up to *t-1* (preventing leakage). - **Future exogenous (futr_exog_list):** features that are known for future times as well. Typical examples: calendar features (we know the day of week of future timestamps), or any planned event schedule, etc. These will be passed via futr_exog_list. NF will use them for conditioning forecasts since they are available for the forecast horizon. - **Static exogenous (stat_exog_list):** time-invariant features per series (for one series, this could be none, or something like an asset category or regime label). We likely won’t have meaningful static features for a single asset beyond an ID, but the pipeline will support it for future extensibility (e.g., if we later add ETH, we might include a static one-hot for asset class). Static features are passed via stat_exog_list.
 
@@ -1198,6 +1198,24 @@ Add these to a quick smoke notebook or unit tests:
 2. **MTF alignment sanity:** fabricate a tiny 1-day series, compute a **1h** moving average via MTF pipeline; confirm that from 09:00 to 09:45 it holds the **08:00–09:00** value, and updates only at **10:00**; confirm final **shift(1)** bumps it one 15m bar.
 3. **Cap enforcement:** ensure total feature columns (excluding `ds`) ≤ 256; fail fast otherwise.
 4. **Stability:** repeated runs on same data yield identical exog matrices (deterministic).
+
+### 3.8 Crypto-specific data-driven features
+
+Some useful exogenous signals are not available from TA libraries and must be derived from exchange data. Treat these as historic exogs and apply the same hygiene as indicators.
+
+- **Funding rates (perpetual futures):** pull from exchange APIs (e.g., Binance Futures) and resample to the 15‑minute EOB grid; forward-fill within the funding interval and apply a strict `shift(1)` at the base frequency.
+- **Open interest (OI):** fetch OI series at the highest available frequency; compute features such as ΔOI, OI z-score, or OI momentum; align to 15‑minute EOB and `shift(1)`.
+- **Spot–perp basis:** compute `(perp_price - spot_price) / spot_price` from synchronized spot and perpetual mid-prices; align to 15‑minute EOB and `shift(1)`.
+- **Order book imbalance (OBI):** stream L2 snapshots (e.g., via cryptofeed), compute imbalance over top N levels: `(Σ bid_qty − Σ ask_qty) / (Σ total_qty)`; downsample to 15‑minute EOB, forward-fill within bar, then `shift(1)`.
+
+Notes:
+- Use CCXT (or native exchange REST/WebSocket) for price/funding/OI endpoints; use cryptofeed for order book depth streams if needed.
+- These are treated as historic exogs: compute → align to 15m EOB → `shift(1)`; never forward‑fill `y`.
+- Enforce the same MTF policy if you build higher‑TF variants (compute on higher TF, merge down with EOB alignment, then `shift(1)`).
+
+### 3.9 Performance note: pandas-on-GPU accelerator (optional)
+
+Indicator libraries (TA‑Lib, vectorbt, pandas‑ta) run on CPU. To reduce wall‑time for surrounding pandas operations (resampling, joins, rolling stats), you may enable **RAPIDS cuDF “pandas accelerator mode”** on compatible hardware. This can speed up the plumbing while leaving indicator kernels on CPU. Keep behavior identical and validate with our Section §2 data checks.
 
 ---
 

@@ -3,6 +3,42 @@
 ## Project Overview
 Intraday BTC forecasting system using 15-minute bars with calibrated prediction intervals. Built with a **NeuralForecast-centric** approach - no custom implementations where NF provides native functionality.
 
+## Role and Objective
+- Design and implement a forecasting architecture that is lean, pragmatic, and strictly aligned with project guidelines and core documentation.
+
+## Instructions
+- Rigorously follow the main specification in `docs/forecasting_sf_plan.md`. Only reference the exact sections required—never load the entire document at once to preserve the context window. Use the provided table of contents and line references to navigate efficiently.
+- Remain focused on practicality. Avoid over-engineering or adding any enterprise-level complexity.
+- Build directly around NeuralForecast (NF). Always prefer native NF primitives and workflows for modeling, losses, scaling/normalization (including RevIN), cross-validation/backtesting, prediction intervals (including conformal methods), and save/load options. Never propose to rebuild or manually duplicate these features—use NF as is wherever possible.
+- Employ the sequential-thinking MCP by default, and use context7 (c7) as needed for any code reference (c7 covers nixtla/neuralforecast).
+- Do not attempt to recreate capabilities already present in NeuralForecast or related nixtla libraries; integrate only necessary thin glue as required.
+- Tone: Be direct, critical, and confident at all times. Avoid filler and affirmation. No "yes-man" behavior.
+
+### Hard Constraints (Non-Negotiable)
+- **Core Library:** The solution must be absolutely NeuralForecast-centric.
+- **Data:** BTC OHLCV data from Kaggle ('Bitcoin Historical Data') is available at `data/raw/btcusd_1-min_data.csv`—do not include steps for data ingestion.
+- **Exogenous Features (Indicator Stack):**
+  - Primary: Use `vectorbt` and `TA-Lib` wrappers for fast, vectorized, and parameterizable production indicators (grid-friendly).
+  - Supplement: Use `pandas-ta-openbb` (pure Python, Numba-accelerated) and `freqtrade/technical` *only* for multi-timeframe resampling/merging where needed.
+- **No Reinvention:** If a capability (cross-validation, probabilistic losses, conformal intervals, scaling/normalization incl. RevIN, early stopping, model orchestration) exists in NF, use it directly, without modification. Any additions must be justified as minimal, thin glue for integration purposes only.
+- **Sibling Libraries:** You may only propose specific and well-justified uses of `StatsForecast`, `MLForecast`, and `HierarchicalForecast` if they add clear, material value—such as benchmarking, baseline models, or temporal/hierarchical reconciliation—and only in a minimal fashion.
+
+## Planning and Verification
+- Begin with a concise checklist (3-7 bullets) of the key conceptual steps you will take before substantive work. Keep items high-level and relevant to the forecasting architecture task.
+- Think step by step; decompose requirements, clarify unknowns, and scope all relevant files, libraries, and APIs before making changes or recommendations.
+- After each code edit or tool invocation, validate the result in 1-2 lines and decide whether to proceed or self-correct as needed.
+- Test as you go. Verify all steps before committing to an output. Prioritize minimal, high-leverage modifications over broad changes. Optimize for low latency—avoid unnecessarily long or complex operations.
+
+## Output Format
+- Produce all outputs in clear Markdown. Use code blocks, lists, and tables where appropriate, labeling files and artifacts in backticks when referenced.
+- Escape inline and display math where used.
+
+## Verbosity
+- Summarize concisely by default. Provide more detailed, readable code and succinct technical commentary where required.
+
+## Stop Conditions
+- Only consider a task complete when it fully meets the specification and all hard constraints, with no unnecessary complexity or redundancy. Escalate with clarifying questions when requirements are ambiguous.
+
 ## Key Documents
 
 ### Planning & Design
@@ -250,6 +286,59 @@ All code must pass these assertions:
 ## Implementation Status
 **Current Phase**: Planning (v0.0.0)
 **Next Steps**: See Phase 1 in `implementation_workflow.md`
+
+## 🚨 CRITICAL: CONCURRENT EXECUTION FOR ALL ACTIONS
+
+**ABSOLUTE RULE**: ALL operations MUST be concurrent/parallel in a single message:
+
+### 🔴 MANDATORY CONCURRENT PATTERNS:
+1. **TodoWrite**: ALWAYS batch ALL todos in ONE call (5-10+ todos minimum)
+2. **Task tool**: ALWAYS spawn ALL agents in ONE message with full instructions
+3. **File operations**: ALWAYS batch ALL reads/writes/edits in ONE message
+4. **Bash commands**: ALWAYS batch ALL terminal operations in ONE message
+5. **Memory operations**: ALWAYS batch ALL memory store/retrieve in ONE message
+
+### ⚡ GOLDEN RULE: "1 MESSAGE = ALL RELATED OPERATIONS"
+
+**Examples of CORRECT concurrent execution:**
+```javascript
+// ✅ CORRECT: Everything in ONE message
+[Single Message]:
+  - TodoWrite { todos: [10+ todos with all statuses/priorities] }
+  - Task("Agent 1 with full instructions and hooks")
+  - Task("Agent 2 with full instructions and hooks")
+  - Task("Agent 3 with full instructions and hooks")
+  - Read("file1.js")
+  - Read("file2.js")
+  - Write("output1.js", content)
+  - Write("output2.js", content)
+  - Bash("npm install")
+  - Bash("npm test")
+  - Bash("npm run build")
+```
+
+**Examples of WRONG sequential execution:**
+```javascript
+// ❌ WRONG: Multiple messages (NEVER DO THIS)
+Message 1: TodoWrite { todos: [single todo] }
+Message 2: Task("Agent 1")
+Message 3: Task("Agent 2")
+Message 4: Read("file1.js")
+Message 5: Write("output1.js")
+Message 6: Bash("npm install")
+// This is 6x slower and breaks coordination!
+```
+
+### 🎯 CONCURRENT EXECUTION CHECKLIST:
+
+Before sending ANY message, ask yourself:
+- ✅ Are ALL related TodoWrite operations batched together?
+- ✅ Are ALL Task spawning operations in ONE message?
+- ✅ Are ALL file operations (Read/Write/Edit) batched together?
+- ✅ Are ALL bash commands grouped in ONE message?
+- ✅ Are ALL memory operations concurrent?
+
+If ANY answer is "No", you MUST combine operations into a single message!
 
 ---
 
