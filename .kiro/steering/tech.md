@@ -9,9 +9,14 @@
 ## Key Libraries
 - **Modeling**: NeuralForecast (primary), PyTorch (backend)
 - **Technical Indicators**: vectorbt, TA-Lib (primary), pandas-ta-openbb, freqtrade/technical (supplement)
-- **Data Processing**: pandas, numpy
+- **Data Processing**: pandas, numpy, pyarrow (parquet support)
 - **Configuration**: PyYAML
-- **Validation**: Custom utilities in `utils/validate.py`
+- **Validation**: Custom utilities in `utils/validate.py` (IMPLEMENTED)
+
+## Implemented Dependencies
+- **pandas**: Data manipulation and analysis (INSTALLED)
+- **pyarrow**: Parquet file support for data persistence (INSTALLED)
+- **numpy**: Numerical computations for log returns and validation (AVAILABLE)
 
 ## NeuralForecast-Only Policy
 - Use NF's native cross-validation - no custom backtesting
@@ -44,6 +49,9 @@ python run_train.py --cv --horizon h4
 
 ### Development
 ```bash
+# Run data processing pipeline (IMPLEMENTED)
+python run_train.py --save-processed
+
 # Run validation checks
 python -m utils.validate
 

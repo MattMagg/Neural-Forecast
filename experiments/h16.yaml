@@ -1,0 +1,81 @@
+# Experiment Configuration for h=16 (4 hour horizon)
+# BTC Intraday Forecasting with NeuralForecast Model Factory
+
+# Global settings
+seed: 1337
+freq: "15min"
+h: 16  # 4 hour horizon (16 * 15min)
+
+# Scaler configuration with per-model overrides
+scaler_type:
+  default: robust
+  PATCHTST: revin
+
+# Cross-validation settings
+n_windows: 6
+step_size: 16
+val_size: 64
+refit: true
+
+# Exogenous variable lists (populated at runtime by feature engineering)
+hist_exog_list: []
+futr_exog_list: []
+stat_exog_list: []
+
+# Model portfolio configuration
+models:
+  - NHITS:
+      alias: NHITS_t1024_T
+      input_size: 1024
+      loss: {kind: studentt}
+      learning_rate: 0.001
+      batch_size: 512
+      n_blocks: [1, 1, 1]
+      n_pool_kernel_size: [2, 2, 1]
+      dropout_prob_theta: 0.1
+      early_stop_patience_steps: 400
+      max_steps: 20000
+      val_check_steps: 100
+      
+  - NBEATSX:
+      alias: NBEATSx_t1024_T
+      input_size: 1024
+      loss: {kind: studentt}
+      learning_rate: 0.001
+      batch_size: 512
+      stack_types: ['identity', 'trend', 'seasonality']
+      n_blocks: [1, 1, 1]
+      mlp_units: [[512, 512], [512, 512], [512, 512]]
+      dropout_prob_theta: 0.1
+      early_stop_patience_steps: 400
+      max_steps: 20000
+      val_check_steps: 100
+      
+  - TIDE:
+      alias: TiDE_t1024_T
+      input_size: 1024
+      loss: {kind: studentt}
+      learning_rate: 0.001
+      batch_size: 512
+      hidden_size: 512
+      num_encoder_layers: 2
+      num_decoder_layers: 2
+      dropout: 0.1
+      early_stop_patience_steps: 400
+      max_steps: 20000
+      val_check_steps: 100
+      
+  - PATCHTST:
+      alias: PatchTST_t2048_T
+      input_size: 2048
+      loss: {kind: studentt}
+      learning_rate: 0.0005  # Slightly lower for PatchTST
+      batch_size: 512
+      patch_len: 16
+      stride: 16
+      n_heads: 8
+      hidden_size: 512
+      revin: true
+      early_stop_patience_steps: 400
+      max_steps: 20000
+      val_check_steps: 100

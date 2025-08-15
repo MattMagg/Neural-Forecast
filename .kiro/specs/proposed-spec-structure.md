@@ -9,6 +9,7 @@ This document outlines the proposed breakdown of the BTC forecasting system into
 The BTC forecasting system is a complex probabilistic forecasting system using NeuralForecast for intraday Bitcoin predictions with calibrated prediction intervals. The system requires strict data discipline, feature engineering, cross-validation, uncertainty quantification, and production deployment capabilities.
 
 ### Global Guardrails (apply to all specs)
+
 - Follow `docs/forecasting_sf_plan.md` Section 0 (Objectives & guardrails).
 - NF-native only: use NF models, CV, scalers, conformal, and `nf.save()/NeuralForecast.load()`.
 - UTC 15‑minute EOB grid; never forward‑fill `y`.
@@ -20,8 +21,10 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 ### **Core Infrastructure Specs**
 
 #### **1. Data Processing and Validation Spec**
+
 **Purpose:** Data contracts, regularization, and validation utilities  
 **Core Components:**
+
 - UTC timestamp handling and grid regularization
 - Target computation (log returns) and data quality gates
 - Canonical NF frame creation with schema validation
@@ -29,6 +32,7 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 - Data validation utilities (assert_regular_grid, assert_utc_eob, assert_shifted)
 
 **Reference Sections in `docs/forecasting_sf_plan.md`:**
+
 - **Primary:** Section 2) Data contracts & validation
   - 2.1 Canonical target frame
   - 2.2 Regularization & data hygiene
@@ -39,7 +43,7 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
   - 2.7 Assembly path
   - 2.8 Minimal integration diff
   - 2.9 Why this is correct
-- **Supporting:** 
+- **Supporting:**
   - Section 0.2 Bar finalization & time ordering
   - Section 0.3 Leakage discipline
   - Section 1.5 Bootstrap stubs - utils/validate.py
@@ -49,8 +53,10 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 ---
 
 #### **2. Feature Engineering Pipeline Spec**
+
 **Purpose:** Technical indicator registry and computation with leakage prevention  
 **Core Components:**
+
 - Technical indicator registry using vectorbt/TA-Lib
 - Supplementary indicators via pandas-ta-openbb (Numba)
 - MTF resampling/merge via freqtrade/technical utilities
@@ -58,10 +64,11 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 - Feature selection with ≤256 cap and ≥98% availability filter
 - Leakage prevention via strict shift(1) rule
 - NF exogenous variable wiring (hist/futr/stat lists)
- - Crypto-specific data-driven features (CCXT/exchange APIs for funding, OI, basis; cryptofeed for order book imbalance) with compute → align (15m EOB) → shift(1)
- - Optional performance: RAPIDS cuDF pandas accelerator for resampling/joins (indicator kernels remain CPU)
+- Crypto-specific data-driven features (CCXT/exchange APIs for funding, OI, basis; cryptofeed for order book imbalance) with compute → align (15m EOB) → shift(1)
+- Optional performance: RAPIDS cuDF pandas accelerator for resampling/joins (indicator kernels remain CPU)
 
 **Reference Sections in `docs/forecasting_sf_plan.md`:**
+
 - **Primary:** Section 3) Exogenous features
   - 3.1 Indicator registry
   - 3.2 Feature builder (compute → align → shift(1))
@@ -78,8 +85,10 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 ---
 
 #### **3. NeuralForecast Model Factory Spec**
+
 **Purpose:** Model instantiation system for NF models  
 **Core Components:**
+
 - Model instantiation for NHITS, NBEATSx, TiDE, PatchTST
 - Loss function configuration (DistributionLoss, MQLoss, ISQF, IQLoss)
 - Training parameter management (batch_size, learning_rate, etc.)
@@ -87,6 +96,7 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 - Scaler configuration (robust, revin for PatchTST)
 
 **Reference Sections in `docs/forecasting_sf_plan.md`:**
+
 - **Primary:** Section 4) NeuralForecast model portfolio & defaults
   - 4.0 Portfolio justification
   - 4.1 Common model parameters
@@ -100,8 +110,10 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 ### **Training and Evaluation Specs**
 
 #### **4. Cross-Validation and Metrics Spec**
+
 **Purpose:** NF-native cross-validation implementation and metrics computation  
 **Core Components:**
+
 - NF-native cross-validation with proper windowing
 - sCRPS computation as primary metric
 - CV windowing strategy per horizon (n_windows, step_size, val_size)
@@ -109,6 +121,7 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 - Leakage prevention in CV setup
 
 **Reference Sections in `docs/forecasting_sf_plan.md`:**
+
 - **Primary:** Section 5) Cross-validation (NF-native)
   - 5.1 Windowing per horizon
   - 5.2 Metrics, outputs, and artifacts
@@ -121,7 +134,7 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
     - 5.2.G Leakage discipline
     - 5.2.H Conformal attachment
     - 5.2.I Save/Load
-- **Supporting:** 
+- **Supporting:**
   - Section 0.4 Cross-validation semantics
   - Section 1.5 Bootstrap stubs - cv/runner.py
 
@@ -130,8 +143,10 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 ---
 
 #### **5. Uncertainty Quantification Spec**
+
 **Purpose:** Probabilistic evaluation and calibration  
 **Core Components:**
+
 - Probabilistic evaluation and calibration assessment
 - PIT analysis and coverage diagnostics
 - Conformal prediction integration via NF's PredictionIntervals
@@ -139,13 +154,14 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 - Coverage validation by volatility decile
 
 **Reference Sections in `docs/forecasting_sf_plan.md`:**
+
 - **Primary:** Section 8) Uncertainty & calibration
   - 8.1 Quantile vs Distribution training
   - 8.2 Conformal prediction intervals
   - 8.3 Diagnostic checks
   - 8.4 Practical fixes
   - 8.5 What to persist
-- **Supporting:** 
+- **Supporting:**
   - Section 0.5 Probabilistic forecasts
   - Section 1.5 Bootstrap stubs - uq/diag.py
 
@@ -154,8 +170,10 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 ---
 
 #### **6. Training Workflow Orchestration Spec**
+
 **Purpose:** YAML-driven experiment configuration and training pipeline  
 **Core Components:**
+
 - YAML-driven experiment configuration system
 - Training pipeline orchestration (run_train.py)
 - Artifact management and model persistence
@@ -165,13 +183,14 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 **Scope boundary:** Offline orchestration only (training, CV, artifacts, optional batch predictions for evaluation). Live inference loop and runtime operations are covered by Spec 9.
 
 **Reference Sections in `docs/forecasting_sf_plan.md`:**
+
 - **Primary:** Section 9) Training & evaluation workflow
   - 9.1 YAML-driven experiment configs
   - 9.2 run_train.py implementation
   - 9.3 run_predict.py implementation
   - 9.4 Artifacts & file layout
   - 9.5 Safety measures
-- **Supporting:** 
+- **Supporting:**
   - Section 1.6 Minimal settings.yaml
   - Section 1.7 Entry-point skeletons
 
@@ -182,8 +201,10 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 ### **Advanced Features Specs**
 
 #### **7. Model Selection and Ensembling Spec**
+
 **Purpose:** Model ranking and ensemble creation  
 **Core Components:**
+
 - Model ranking by mean sCRPS across CV windows
 - Top-2 ensemble creation with equal-weight averaging
 - Model promotion criteria (≥1% sCRPS improvement)
@@ -191,6 +212,7 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 - Performance tracking and selection protocols
 
 **Reference Sections in `docs/forecasting_sf_plan.md`:**
+
 - **Primary:** Section 7) Model selection & simple ensembling
   - 7.1 Selection protocol
   - 7.2 Simple ensembles
@@ -205,8 +227,10 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 ---
 
 #### **8. Hyperparameter Optimization Spec**
+
 **Purpose:** Bounded search spaces and optimization strategy  
 **Core Components:**
+
 - Bounded, model-specific search spaces
 - Pilot → promote → full CV workflow
 - Promotion criteria (≥0.5% sCRPS improvement for advancement)
@@ -214,6 +238,7 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 - n_windows progression (6 → 10)
 
 **Reference Sections in `docs/forecasting_sf_plan.md`:**
+
 - **Primary:** Section 6) Hyperparameter strategy
   - 6.1 Search spaces
   - 6.2 Pilot → promote → full CV
@@ -229,8 +254,10 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 ### **Production and Deployment Specs**
 
 #### **9. Inference and Live Deployment Spec**
+
 **Purpose:** Real-time prediction pipeline and live deployment  
 **Core Components:**
+
 - Real-time prediction pipeline (run_predict.py)
 - Live loop implementation with 45+ second buffer
 - Tail feature building and prediction generation
@@ -240,6 +267,7 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 **Scope boundary:** Runtime inference and live operations only. Uses persisted models/artifacts from Spec 6; does not include training orchestration or artifact generation.
 
 **Reference Sections in `docs/forecasting_sf_plan.md`:**
+
 - **Primary:** Section 10) Inference & live deployment
   - 10.1 15-minute sequence
   - 10.2 Tail builders
@@ -254,8 +282,10 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 ---
 
 #### **10. Monitoring and Maintenance Spec**
+
 **Purpose:** Performance monitoring and drift detection  
 **Core Components:**
+
 - Performance monitoring and drift detection
 - Retraining triggers and procedures
 - Rollback mechanisms and version management
@@ -264,6 +294,7 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 - PSI thresholds for distribution shift (0.2 moderate, 0.3 major)
 
 **Reference Sections in `docs/forecasting_sf_plan.md`:**
+
 - **Primary:** Section 11) Maintenance & retraining
   - 11.1 Cadence & triggers
   - 11.2 Versioning & pinning
@@ -281,8 +312,10 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 ### **Quality and Risk Management Specs**
 
 #### **11. Risk Mitigation and Error Handling Spec**
+
 **Purpose:** Comprehensive error handling and risk mitigation  
 **Core Components:**
+
 - Comprehensive error handling strategies
 - Data quality safeguards and validation
 - Training stability and GPU memory management
@@ -291,6 +324,7 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 - Graceful degradation strategies
 
 **Reference Sections in `docs/forecasting_sf_plan.md`:**
+
 - **Primary:** Section 14) Risks & mitigations
   - 14.1 MTF misalignment
   - 14.2 Leakage from non-shifted exogs
@@ -306,8 +340,10 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 ---
 
 #### **12. Quality Gates and Acceptance Testing Spec**
+
 **Purpose:** Acceptance criteria and quality validation  
 **Core Components:**
+
 - Acceptance criteria and quality thresholds
 - Automated testing and validation procedures
 - Acceptance reporting and promotion gates
@@ -315,6 +351,7 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 - Rollback criteria for live deployment
 
 **Reference Sections in `docs/forecasting_sf_plan.md`:**
+
 - **Primary:** Section 12) Acceptance criteria & quality gates
   - 12.1 Hard pass/fail gates
   - 12.2 Rollback criteria
@@ -329,8 +366,10 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 ### **Integration and Configuration Specs**
 
 #### **13. Configuration Management Spec**
+
 **Purpose:** Settings management and project structure  
 **Core Components:**
+
 - Project structure and directory organization
 - Settings management and YAML configuration
 - Environment setup and dependency management
@@ -338,6 +377,7 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 - Coding standards and conventions
 
 **Reference Sections in `docs/forecasting_sf_plan.md`:**
+
 - **Primary:** Section 1) Repository layout
   - 1.1 Directory scaffold
   - 1.2 File inventory
@@ -353,8 +393,10 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 ---
 
 #### **14. Integration Testing and Validation Spec**
+
 **Purpose:** End-to-end pipeline testing and validation  
 **Core Components:**
+
 - End-to-end pipeline testing
 - Integration validation and smoke tests
 - Performance testing and benchmarking
@@ -362,6 +404,7 @@ The BTC forecasting system is a complex probabilistic forecasting system using N
 - Definition of Done criteria
 
 **Reference Sections in `docs/forecasting_sf_plan.md`:**
+
 - **Primary:** Section 13) Implementation checklist
   - Phase 0-11 implementation phases
   - Parallelization guide

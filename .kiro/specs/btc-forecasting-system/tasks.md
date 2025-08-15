@@ -111,7 +111,7 @@
     - Create experiments/h16.yaml with h=16, step_size=16, val_size=64 for 4-hour horizon (copy exact example from plan)
     - Create experiments/h32.yaml with h=32, step_size=32, val_size=128 for 8-hour horizon
     - Use exact model configurations from §9.1 example: NHITS, NBEATSx, TiDE, PatchTST with specified parameters
-    - Configure exact loss specifications from plan: {kind: studentt} and {kind: mqloss, quantiles: [0.05,0.1,0.2,0.3,0.5,0.7,0.8,0.9,0.95]}
+    - Configure exact loss specifications from plan: {kind: studentt} and {kind: mqloss, level: [80, 90, 95]}
     - Set exact training parameters from plan: learning_rate=0.001, batch_size=512, max_steps=20000, early_stop_patience_steps=400
   - Ensure artifact paths stable: experiments/h{h}/cv_results.parquet, experiments/h{h}/metrics.csv, experiments/h{h}/best/
     - _Reference: §9.1 experiments/h16.yaml example in /Users/mac-main/Neural-Forecast/docs/forecasting_sf_plan.md_

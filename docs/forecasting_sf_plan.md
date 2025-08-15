@@ -1322,7 +1322,7 @@ def make_models(h, hist_cols, futr_cols, stat_cols):
 | `input_size`                |            **1024** (NHITS/NBEATSx/TiDE), **2048** (PatchTST) | Long contexts stabilize intraday; PatchTST benefits from longer windows.              |
 | `scaler_type`               |                                                  **"robust"** | Median/MAD robust to spikes in crypto; part of NF TemporalNorm.                       |
 | `revin` (PatchTST only)     |                                                      **True** | Helpful under distribution shift in scale; supported by PatchTST.                     |
-| `loss`                      | **DistributionLoss("StudentT")** **or** **MQLoss(quantiles)** | Student-t handles heavy tails; MQLoss for direct quantiles.                           |
+| `loss`                      | **DistributionLoss("StudentT")** **or** **MQLoss(level)** | Student-t handles heavy tails; MQLoss for direct quantiles.                           |
 | `learning_rate`             |                               **1e-3** (try 5e-4 if unstable) | Stable for these models; tune locally if gradients oscillate. (Model arg exists.)     |
 | `batch_size`                |                             **512** sequences (tune 256–1024) | Throughput vs. GPU memory; models expose `batch_size`.                                |
 | `max_steps`                 |                                             **20_000** (cap) | Guards overfitting; all models accept `max_steps`.                                    |
@@ -1390,20 +1390,20 @@ import inspect
 from neuralforecast.models import NHITS, NBEATSx, TiDE, PatchTST
 from neuralforecast.losses.pytorch import DistributionLoss, MQLoss, IQLoss
 
-# ---- canonical quantiles used when quantile training is requested
-DEFAULT_QUANTILES = [0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 0.8, 0.9, 0.95]
+# ---- canonical levels used when quantile training is requested
+DEFAULT_LEVELS = [80, 90, 95]
 
 def _loss_ctor(spec: Dict[str, Any]):
-    """spec: {'kind': 'studentt'|'mqloss'|'iqloss', 'quantiles':[...] }"""
+    """spec: {'kind': 'studentt'|'mqloss'|'iqloss', 'level':[...] }"""
     kind = spec.get("kind", "studentt").lower()
     if kind in ("studentt", "student_t", "t", "dist_studentt"):
         return DistributionLoss("StudentT")
     if kind in ("mqloss", "mq", "quantile"):
-        qs = spec.get("quantiles", DEFAULT_QUANTILES)
-        return MQLoss(quantiles=qs)
+        levels = spec.get("level", [80, 90, 95])
+        return MQLoss(level=levels)
     if kind in ("iqloss", "iq"):
-        qs = spec.get("quantiles", DEFAULT_QUANTILES)
-        return IQLoss(quantiles=qs)
+        levels = spec.get("level", [80, 90, 95])
+        return IQLoss(level=levels)
     raise ValueError(f"Unsupported loss kind: {kind}")
 
 def _prune_kwargs(model_cls, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -1511,7 +1511,7 @@ models:
   - NBEATSx:
       alias: NBEATSx_t1024_MQ
       input_size: 1024
-      loss: {kind: mqloss, quantiles: [0.05,0.1,0.2,0.3,0.5,0.7,0.8,0.9,0.95]}
+      loss: {kind: mqloss, level: [80, 90, 95]}
       learning_rate: 0.001
       batch_size: 512
       n_blocks: [1,1,1]
@@ -2556,7 +2556,7 @@ models:
   - NBEATSx:
       alias: NBEATSx_t1024_MQ
       input_size: 1024
-      loss: {kind: mqloss, quantiles: [0.05,0.1,0.2,0.3,0.5,0.7,0.8,0.9,0.95]}
+      loss: {kind: mqloss, level: [80, 90, 95]}
       learning_rate: 0.001
       batch_size: 512
       n_blocks: [1,1,1]

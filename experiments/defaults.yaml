@@ -1,0 +1,61 @@
+# Default Configuration Parameters
+# Shared parameters across all horizon experiments
+
+# Global defaults
+seed: 1337
+freq: "15min"
+
+# Default scaler configuration
+scaler_type:
+  default: robust
+  PATCHTST: revin
+
+# Default cross-validation settings
+n_windows: 6
+val_size: 64
+refit: true
+
+# Default training parameters
+training_defaults:
+  learning_rate: 0.001
+  batch_size: 512
+  early_stop_patience_steps: 400
+  max_steps: 20000
+  val_check_steps: 100
+
+# Model-specific defaults
+model_defaults:
+  NHITS:
+    input_size: 1024
+    n_blocks: [1, 1, 1]
+    n_pool_kernel_size: [2, 2, 1]
+    dropout_prob_theta: 0.1
+    
+  NBEATSX:
+    input_size: 1024
+    stack_types: ['identity', 'trend', 'seasonality']
+    n_blocks: [1, 1, 1]
+    mlp_units: [[512, 512], [512, 512], [512, 512]]
+    dropout_prob_theta: 0.1
+    
+  TIDE:
+    input_size: 1024
+    hidden_size: 512
+    num_encoder_layers: 2
+    num_decoder_layers: 2
+    dropout: 0.1
+    
+  PATCHTST:
+    input_size: 2048
+    patch_len: 16
+    stride: 16
+    n_heads: 8
+    hidden_size: 512
+    revin: true
+    learning_rate: 0.0005  # Lower learning rate for PatchTST
+
+# Default loss configurations
+loss_defaults:
+  studentt: {kind: studentt}
+  mqloss_80_90_95: {kind: mqloss, level: [80, 90, 95]}
+  iqloss: {kind: iqloss}
