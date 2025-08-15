@@ -6,6 +6,25 @@ The Data Processing and Validation spec establishes the foundational data contra
 
 ## Requirements
 
+### Requirement 0: Data Source and 1-Minute to 15-Minute Aggregation
+
+**User Story:** As a data processing pipeline, I need to load raw 1-minute BTC OHLCV data and aggregate it to 15-minute bars with proper UTC EOB alignment for the forecasting system.
+
+#### Acceptance Criteria
+
+1. WHEN loading raw data THEN the system SHALL read from `data/raw/btcusd_1-min_data.csv` containing 1-minute OHLCV bars
+2. WHEN processing 1-minute data THEN the system SHALL aggregate to 15-minute bars using these exact rules:
+   - Open: first value in each 15-minute window
+   - High: maximum value in each 15-minute window
+   - Low: minimum value in each 15-minute window
+   - Close: last value in each 15-minute window
+   - Volume: sum of volumes in each 15-minute window
+3. WHEN aggregating timestamps THEN the system SHALL use pandas resample with label='right' and closed='right' for proper EOB alignment
+4. WHEN aligning to 15-minute boundaries THEN the system SHALL snap to UTC timestamps at :00, :15, :30, :45 minutes
+5. WHEN implementing aggregation THEN the system SHALL use the function aggregate_1min_to_15min in utils/io.py
+6. IF the raw data file is missing or corrupted THEN the system SHALL raise a clear FileNotFoundError or ValueError with diagnostic information
+7. IF 1-minute data has gaps THEN the system SHALL handle them gracefully by creating NaN entries in the aggregated 15-minute bars
+
 ### Requirement 1: UTC Timestamp Handling and Grid Regularization
 
 **User Story:** As a forecasting system, I want to ensure all timestamps are properly handled in UTC with end-of-bar (EOB) semantics and regular 15-minute grids, so that temporal alignment is consistent and predictable across all data processing operations.
@@ -110,7 +129,7 @@ The Data Processing and Validation spec establishes the foundational data contra
 #### Acceptance Criteria
 
 1. WHEN implementing validation functions THEN the system SHALL place assert_regular_grid, assert_utc_eob, assert_shifted, assert_no_forward_fill_y in utils/validate.py
-2. WHEN implementing data processing functions THEN the system SHALL place regularize_to_grid_utc, make_nf_canonical, drop_train_nans_and_winsorize in utils/io.py
+2. WHEN implementing data processing functions THEN the system SHALL place aggregate_1min_to_15min, regularize_to_grid_utc, make_nf_canonical, drop_train_nans_and_winsorize in utils/io.py
 3. WHEN implementing load/save functions THEN the system SHALL place load_canonical_frame, save_parquet, timestamped_path in utils/io.py
 4. WHEN validation functions fail THEN the system SHALL raise AssertionError with specific diagnostic messages
 5. WHEN utility functions encounter errors THEN the system SHALL raise ValueError with clear descriptions of the problem

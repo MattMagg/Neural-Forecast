@@ -12,21 +12,22 @@ The design follows a strict assembly path: raw data → regularization → canon
 
 ```mermaid
 graph TD
-    A[Raw OHLCV Data] --> B[regularize_to_grid_utc]
-    B --> C[make_nf_canonical]
-    C --> D[drop_train_nans_and_winsorize]
-    D --> E[Feature Integration]
-    E --> F[Validation Gates]
-    F --> G[NF-Ready DataFrame]
+    A[Raw 1-Min OHLCV Data<br/>data/raw/btcusd_1-min_data.csv] --> B[aggregate_1min_to_15min]
+    B --> C[regularize_to_grid_utc]
+    C --> D[make_nf_canonical]
+    D --> E[drop_train_nans_and_winsorize]
+    E --> F[Feature Integration]
+    F --> G[Validation Gates]
+    G --> H[NF-Ready DataFrame]
     
-    H[Validation Utilities] --> F
-    I[Error Handling] --> F
+    I[Validation Utilities] --> G
+    J[Error Handling] --> G
     
     subgraph "Validation Gates"
-        F1[assert_regular_grid]
-        F2[assert_utc_eob]
-        F3[assert_shifted]
-        F4[assert_no_forward_fill_y]
+        G1[assert_regular_grid]
+        G2[assert_utc_eob]
+        G3[assert_shifted]
+        G4[assert_no_forward_fill_y]
     end
 ```
 
@@ -48,6 +49,80 @@ The system is organized into two main utility modules:
 ## Components and Interfaces
 
 ### Data Processing Components (utils/io.py)
+
+#### aggregate_1min_to_15min Function
+
+**Purpose**: Aggregate 1-minute OHLCV data to 15-minute bars with proper UTC EOB alignment
+
+**Interface**:
+```python
+def aggregate_1min_to_15min(df_1min: pd.DataFrame) -> pd.DataFrame
+```
+
+**Implementation Strategy**:
+- Load 1-minute data from `data/raw/btcusd_1-min_data.csv`
+- Convert timestamp column to UTC datetime64[ns] format
+- Use pandas resample with label='right' and closed='right' for EOB semantics
+- Apply aggregation rules:
+  - Open: 'first' - first value in 15-minute window
+  - High: 'max' - maximum value in 15-minute window
+  - Low: 'min' - minimum value in 15-minute window
+  - Close: 'last' - last value in 15-minute window
+  - Volume: 'sum' - sum of volumes in 15-minute window
+- Ensure output timestamps align to :00, :15, :30, :45 boundaries
+- Handle gaps in 1-minute data by creating NaN entries in output
+
+**Error Handling**:
+- Raise FileNotFoundError if data file doesn't exist
+- Raise ValueError if required columns (open, high, low, close, volume) are missing
+- Handle timezone conversion errors with clear messages
+
+**Implementation Example**:
+```python
+def aggregate_1min_to_15min(df_1min: pd.DataFrame) -> pd.DataFrame:
+    """
+    Aggregate 1-minute OHLCV data to 15-minute bars.
+    
+    Args:
+        df_1min: DataFrame with 1-minute OHLCV data
+        
+    Returns:
+        DataFrame with 15-minute OHLCV bars, UTC EOB timestamps
+    """
+    # Ensure timestamp column exists
+    if 'timestamp' not in df_1min.columns and 'ds' not in df_1min.columns:
+        raise ValueError("No timestamp column found in 1-minute data")
+    
+    # Convert to UTC datetime
+    ts_col = 'timestamp' if 'timestamp' in df_1min.columns else 'ds'
+    df_1min['ds'] = pd.to_datetime(df_1min[ts_col], utc=True)
+    df_1min = df_1min.set_index('ds')
+    
+    # Validate required columns
+    required_cols = ['open', 'high', 'low', 'close', 'volume']
+    missing_cols = [col for col in required_cols if col not in df_1min.columns]
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    # Resample to 15-minute bars with EOB alignment
+    df_15min = df_1min.resample('15min', label='right', closed='right').agg({
+        'open': 'first',
+        'high': 'max',
+        'low': 'min',
+        'close': 'last',
+        'volume': 'sum'
+    })
+    
+    # Reset index to get ds column back
+    df_15min = df_15min.reset_index()
+    
+    # Ensure EOB timestamps (:00, :15, :30, :45)
+    minutes = df_15min['ds'].dt.minute
+    if not all(minutes.isin([0, 15, 30, 45])):
+        raise ValueError("Aggregation produced non-EOB timestamps")
+    
+    return df_15min
+```
 
 #### regularize_to_grid_utc Function
 
@@ -237,15 +312,27 @@ def timestamped_path(base_dir: str, stem: str, ext: str = "parquet") -> str
 
 ### Input Data Schema
 
-**Raw OHLCV Data**:
+**Raw 1-Minute OHLCV Data** (from `data/raw/btcusd_1-min_data.csv`):
 ```python
 {
-    "timestamp": datetime64[ns],  # or "ds"
+    "timestamp": datetime64[ns],  # 1-minute frequency
     "open": float64,
     "high": float64,
     "low": float64,
     "close": float64,
     "volume": float64
+}
+```
+
+**Aggregated 15-Minute OHLCV Data** (after `aggregate_1min_to_15min`):
+```python
+{
+    "ds": datetime64[ns, UTC],  # 15-minute EOB timestamps
+    "open": float64,            # First value in 15-min window
+    "high": float64,            # Max value in 15-min window
+    "low": float64,             # Min value in 15-min window
+    "close": float64,           # Last value in 15-min window
+    "volume": float64           # Sum of volumes in 15-min window
 }
 ```
 
