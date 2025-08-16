@@ -65,7 +65,9 @@ def _loss_ctor(spec: Dict[str, Any]) -> Union[DistributionLoss, MQLoss, IQLoss]:
     kind = spec['kind'].lower()
     
     if kind == 'studentt':
-        return DistributionLoss(distribution="StudentT")
+        # Add return_params=True to get distribution parameters for probabilistic predictions
+        # This is required for proper uncertainty quantification
+        return DistributionLoss(distribution="StudentT", return_params=True)
     
     elif kind == 'mqloss':
         levels = spec.get('level', DEFAULT_LEVELS)
@@ -103,14 +105,26 @@ def _prune_kwargs(model_cls: Type, params: Dict[str, Any]) -> Dict[str, Any]:
         sig = inspect.signature(model_cls.__init__)
         valid_params = set(sig.parameters.keys())
         
-        # Check for required exogenous list support
-        required_exog_params = ['hist_exog_list', 'futr_exog_list', 'stat_exog_list']
-        for param in required_exog_params:
-            if param not in valid_params:
-                raise ModelInstantiationError(
-                    f"{model_cls.__name__} does not support {param}. "
-                    f"All models must support exogenous variable lists."
-                )
+        # Special handling for PatchTST which doesn't support exogenous variables
+        # According to NeuralForecast documentation, PatchTST has:
+        # EXOGENOUS_FUTR = False, EXOGENOUS_HIST = False, EXOGENOUS_STAT = False
+        if model_cls.__name__ == 'PatchTST':
+            # Remove exogenous parameters for PatchTST
+            exog_params = ['hist_exog_list', 'futr_exog_list', 'stat_exog_list']
+            for param in exog_params:
+                if param in params:
+                    print(f"Warning: PatchTST does not support exogenous variables. "
+                          f"Removing {param} from configuration.")
+                    params.pop(param)
+        else:
+            # For other models, check for required exogenous list support
+            required_exog_params = ['hist_exog_list', 'futr_exog_list', 'stat_exog_list']
+            for param in required_exog_params:
+                if param not in valid_params:
+                    raise ModelInstantiationError(
+                        f"{model_cls.__name__} does not support {param}. "
+                        f"All models must support exogenous variable lists."
+                    )
         
         # Filter to only supported parameters
         pruned = {k: v for k, v in params.items() if k in valid_params}

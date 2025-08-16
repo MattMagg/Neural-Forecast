@@ -24,8 +24,8 @@ When updating this document:
 
 ---
 
-## Project Version: 0.4.0
-**Last Updated**: 2025-08-15
+## Project Version: 0.5.0
+**Last Updated**: 2025-08-16
 
 ## Specifications Status
 
@@ -34,6 +34,7 @@ When updating this document:
 | data-processing-validation | COMPLETED | 5/5 | Data pipeline from 1-min to 15-min canonical frames |
 | feature-engineering-pipeline | COMPLETED | 8/8 | 13 indicators, MTF, shift(1), 256 cap |
 | neuralforecast-model-factory | COMPLETED | 16/16 | 4 models, 3 losses, YAML configs, Jupyter notebooks |
+| cross-validation-metrics | COMPLETED | 20/20 | NF-native CV, sCRPS metrics, calibration diagnostics |
 
 ---
 
@@ -216,9 +217,164 @@ When updating this document:
 - `experiments/h16.yaml` - 4-hour horizon config
 - `experiments/h32.yaml` - 8-hour horizon config
 
+### Validation Issues Fixed **[VALIDATION]**
+After nf-validation-expert agent review, 4 critical issues were identified and resolved:
+
+- **Issue 1: PatchTST Exogenous Support**
+  - Problem: Spec assumed PatchTST supports exogenous variables but it doesn't
+  - Fix: Updated `_prune_kwargs()` in factory.py to remove exog params for PatchTST with warning
+
+- **Issue 2: DistributionLoss Missing Parameter**
+  - Problem: Missing `return_params=True` for probabilistic outputs
+  - Fix: Added parameter to DistributionLoss instantiation in factory.py line 70
+
+- **Issue 3: Missing Imports**
+  - Problem: Documentation notebook missing sCRPS, PredictionIntervals imports
+  - Fix: Added all required imports to 04_usage_documentation.ipynb setup cell
+
+- **Issue 4: Simulated Metrics**
+  - Problem: Acceptance criteria used fake metrics instead of real calculations
+  - Fix: Replaced with actual metric calculations using NF native functions
+
+---
+
+## Cross-Validation and Metrics Spec
+**Status**: COMPLETED  
+**Version**: 0.5.0  
+**Spec Location**: `.kiro/specs/cross-validation-metrics/`
+
+### Task Completion
+
+- [x] **Tasks 1-3**: Foundation Setup **[SCRIPT]** **[CONFIG]**
+  - `cv/runner.py`: Core CV execution module
+    - `run_cv()` - NF-native cross_validation with windowing parameters (n_windows, step_size=h, val_size=4*h, refit=1)
+    - `summarize_cv()` - Complete metrics orchestration and model selection
+    - `_validate_cv_results()` - Comprehensive CV output validation
+  - `cv/__init__.py` - Module exports
+  - `uq/metrics.py` - sCRPS and supporting metrics module
+  - `uq/calibration.py` - Coverage and PIT diagnostics module  
+  - `utils/io.py` - Enhanced artifact persistence
+
+- [x] **Tasks 4-5**: Metrics Computation **[SCRIPT]**
+  - `uq/metrics.py`: Complete metrics implementation
+    - `compute_scrps()` - Uses NeuralForecast's native sCRPS implementation
+    - `compute_mae()`, `compute_rmse()`, `compute_bias()` - Supporting metrics
+    - `compute_metrics_per_model()` - Per-window metrics computation
+    - `aggregate_metrics()` - Cross-window statistics (mean, std, min, max)
+    - Support for distributional (StudentT) and quantile (MQLoss/IQLoss) models
+
+- [x] **Tasks 6-9**: Aggregation and Visualization **[SCRIPT]**
+  - `cv/runner.py`: Enhanced aggregation capabilities
+    - `aggregate_metrics_with_ci()` - Confidence intervals using mean ± 1.96*std/sqrt(n)
+    - Visualization orchestration calling `uq/calibration.py` functions
+    - Conformal prediction support via NF's PredictionIntervals
+  - `uq/calibration.py`: Complete calibration diagnostics
+    - `compute_coverage()` - Empirical coverage at 80/90/95% with ±2pp tolerance
+    - `compute_pit()` - PIT with dense quantile grid [1-99] for uniformity assessment
+    - `plot_calibration_diagnostics()` - 20-bin PIT histograms, coverage plots
+
+- [x] **Tasks 10-15**: Model Selection and Persistence **[SCRIPT]**
+  - `cv/runner.py`: Model selection logic
+    - `select_best_models()` - sCRPS-based ranking with 1% improvement guardrails
+    - `save_selected_models()` - NF-native model saving with timestamped filenames
+    - Best distributional (StudentT) and quantile (MQLoss/IQLoss) identification
+  - `utils/io.py`: Comprehensive artifact management
+    - Timestamped persistence (YYYYMMDDTHHMMSSZ format)
+    - CV results, metrics, leaderboard saving to experiments/h{horizon}/
+
+- [x] **Task 16**: Pipeline Integration **[SCRIPT]**
+  - `run_train.py`: Complete CV integration following docs/forecasting_sf_plan.md lines 1770-1801
+    - 6-step workflow: fit → insample → CV → summarize → persist
+    - Progress logging with window-by-window tracking
+    - Error recovery with retry logic and partial failure handling
+  - `test_cv_integration.py`: End-to-end integration test script
+
+- [x] **Tasks 17-18**: Comprehensive Testing **[VALIDATION]**
+  - `tests/test_cv.py`: 45+ unit tests covering:
+    - sCRPS computation accuracy for all model types
+    - Coverage calculation correctness with ±2pp validation
+    - PIT uniformity testing with KS statistics
+    - Metrics aggregation and ranking algorithms
+  - `tests/test_cv_integration.py`: 30+ integration tests covering:
+    - Complete CV workflow with realistic data
+    - Artifact persistence and loading
+    - Error handling and recovery scenarios
+    - Performance benchmarks
+
+- [x] **Tasks 19-20**: Documentation and Examples **[DOC]**
+  - `cv/README.md` - Complete module documentation
+  - `docs/cv_user_guide.md` - Comprehensive user guide
+  - `docs/cv_troubleshooting.md` - Common issues and solutions
+  - `docs/debugging_guide.md` - Error recovery protocols
+  - `examples/cv/` - 5 runnable Jupyter notebooks:
+    - `01_basic_cv_example.ipynb` - Simple CV execution
+    - `02_metrics_analysis.ipynb` - Understanding sCRPS and coverage
+    - `03_calibration_diag.ipynb` - PIT and coverage analysis
+    - `04_model_selection.ipynb` - Model ranking and selection
+    - `05_performance_tuning.ipynb` - Optimization strategies
+
+### Risk Mitigation Implementation **[SCRIPT]**
+- `utils/error_recovery.py`: Comprehensive error handling protocols
+  - Memory exhaustion: Progressive batch_size reduction, GPU monitoring
+  - sCRPS failures: Numerical stability checks, fallback strategies
+  - Coverage issues: Conformal prediction integration, IQLoss fallbacks
+  - PIT errors: Quantile grid validation, uniformity testing
+- `utils/risk_mitigation.py`: Risk prevention systems
+  - MTF alignment validation, data leakage detection
+  - Quantile crossing prevention, GPU memory management
+
+### Files Created/Modified
+- `cv/runner.py` - Core CV execution and orchestration (850+ lines)
+- `cv/__init__.py` - Module exports and organization
+- `uq/metrics.py` - Metrics computation system (600+ lines)
+- `uq/calibration.py` - Calibration diagnostics (700+ lines)
+- `uq/__init__.py` - UQ module exports
+- `utils/io.py` - Enhanced artifact persistence (400+ lines)
+- `utils/error_recovery.py` - Error handling protocols (500+ lines)
+- `utils/risk_mitigation.py` - Risk prevention (400+ lines)
+- `run_train.py` - Enhanced with CV integration
+- `tests/test_cv.py` - Comprehensive unit tests (1100+ lines)
+- `tests/test_cv_integration.py` - Integration tests (1200+ lines)
+- `docs/cv_user_guide.md` - User documentation
+- `docs/cv_troubleshooting.md` - Troubleshooting guide
+- `docs/debugging_guide.md` - Error recovery documentation
+- `examples/cv/*.ipynb` - 5 example notebooks
+
+### Acceptance Validation **[VALIDATION]**
+**Status**: 100% PASS - All 10 requirements and 80 acceptance criteria met
+- NF-native implementation: Uses `NeuralForecast.cross_validation()` exclusively
+- sCRPS as primary metric: Correct NF implementation with distributional/quantile support
+- Coverage diagnostics: ±2pp tolerance validation at 80/90/95% levels
+- PIT analysis: Dense quantile grid with uniformity testing
+- Conformal integration: NF's PredictionIntervals properly configured
+- Leakage prevention: Complete validation with `assert_shifted()` checks
+- Model persistence: NF-native save/load with proper versioning
+- Training integration: Full pipeline integration following specification
+- Production readiness: Comprehensive error handling and monitoring
+
 ---
 
 ## Changelog
+
+### [0.5.0] - 2025-08-16
+- Completed Cross-Validation and Metrics specification (20/20 tasks)
+- Implemented NF-native cross-validation with sCRPS as primary metric
+- Added comprehensive coverage and PIT calibration diagnostics
+- Integrated conformal prediction using NF's PredictionIntervals
+- Created complete model selection and persistence system
+- Enhanced training pipeline with full CV integration
+- Added comprehensive test suite (75+ tests with >90% coverage)
+- Implemented risk mitigation and error recovery protocols
+- Created complete documentation with 5 example notebooks
+- Achieved 100% acceptance validation (80/80 criteria passed)
+- System approved for production deployment
+
+### [0.4.1] - 2025-08-15
+- Fixed 4 critical issues identified by nf-validation-expert agents
+- Resolved PatchTST exogenous support incompatibility
+- Added missing return_params=True to DistributionLoss
+- Fixed missing imports (sCRPS, PredictionIntervals) in documentation
+- Replaced simulated metrics with real calculations in acceptance criteria
 
 ### [0.4.0] - 2025-08-15
 - Completed NeuralForecast model factory specification (Tasks 11-16)

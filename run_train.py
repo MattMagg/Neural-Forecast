@@ -2,8 +2,12 @@
 """
 Training pipeline for the BTC forecasting system.
 
-This script implements the complete data assembly path:
-load raw OHLCV → aggregate_1min_to_15min → regularize_to_grid_utc → make_nf_canonical → validate
+This script implements the complete data assembly and training path:
+1. Load raw OHLCV → aggregate → regularize → make canonical → validate
+2. Integrate features with leakage prevention
+3. Instantiate NeuralForecast models from configuration
+4. Run cross-validation with progress logging
+5. Generate comprehensive metrics and save artifacts
 """
 
 import pandas as pd
@@ -11,6 +15,12 @@ import numpy as np
 from pathlib import Path
 import argparse
 import sys
+import yaml
+import json
+import logging
+from datetime import datetime
+import time
+from typing import Dict, Any, List, Optional, Tuple
 
 # Import data processing functions
 from utils.io import (
@@ -30,6 +40,23 @@ from utils.validate import (
     assert_shifted,
     assert_no_forward_fill_y
 )
+
+# Import CV runner functions for cross-validation
+from cv.runner import run_cv, summarize_cv, save_cv_results, generate_cv_summary_report
+
+# Import model factory for NF model instantiation
+from nf_models.factory import instantiate_models
+
+# Import NeuralForecast
+from neuralforecast import NeuralForecast
+
+# Configure logging with timestamp and level
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 
 def load_and_process_data(raw_data_path: str = "data/raw/btcusd_1-min_data.csv") -> pd.DataFrame:
@@ -183,6 +210,362 @@ def save_processed_data(df: pd.DataFrame, output_dir: str = "data/processed") ->
     return output_path
 
 
+def load_experiment_config(config_path: str) -> Dict[str, Any]:
+    """Load experiment configuration from YAML file.
+    
+    Args:
+        config_path: Path to experiment YAML config (e.g., experiments/h4.yaml)
+        
+    Returns:
+        Configuration dictionary
+        
+    Raises:
+        FileNotFoundError: If config file doesn't exist
+        yaml.YAMLError: If config file is malformed
+    """
+    config_path = Path(config_path)
+    if not config_path.exists():
+        raise FileNotFoundError(f"Configuration file not found: {config_path}")
+    
+    logger.info(f"Loading experiment configuration from {config_path}")
+    with open(config_path, 'r') as f:
+        cfg = yaml.safe_load(f)
+    
+    # Validate required CV parameters
+    required_keys = ['h', 'n_windows', 'step_size', 'val_size', 'models']
+    missing_keys = [k for k in required_keys if k not in cfg]
+    if missing_keys:
+        raise ValueError(f"Configuration missing required keys: {missing_keys}")
+    
+    # Validate CV parameter relationships
+    if cfg['step_size'] != cfg['h']:
+        logger.warning(f"step_size ({cfg['step_size']}) != h ({cfg['h']}). Setting step_size=h to prevent overlap.")
+        cfg['step_size'] = cfg['h']
+    
+    expected_val_size = 4 * cfg['h']
+    if cfg['val_size'] != expected_val_size:
+        logger.warning(f"val_size ({cfg['val_size']}) != 4*h ({expected_val_size}). Setting val_size=4*h.")
+        cfg['val_size'] = expected_val_size
+    
+    logger.info(f"Configuration loaded: h={cfg['h']}, n_windows={cfg['n_windows']}, "
+                f"step_size={cfg['step_size']}, val_size={cfg['val_size']}")
+    return cfg
+
+
+def train_and_evaluate(
+    nf_df: pd.DataFrame,
+    hist_cols: List[str],
+    futr_cols: List[str],
+    stat_cols: List[str],
+    cfg: Dict[str, Any],
+    output_dir: Path,
+    use_conformal: bool = False,
+    save_models: bool = True
+) -> Dict[str, Any]:
+    """Train models and run cross-validation with comprehensive evaluation.
+    
+    This function implements the exact integration pattern from docs/forecasting_sf_plan.md
+    lines 1770-1801, with additional error handling and progress logging.
+    
+    Args:
+        nf_df: Canonical NF DataFrame with features
+        hist_cols: List of historical feature columns
+        futr_cols: List of future feature columns
+        stat_cols: List of static feature columns
+        cfg: Experiment configuration
+        output_dir: Directory for saving outputs
+        use_conformal: Whether to use conformal prediction
+        save_models: Whether to save the best models
+        
+    Returns:
+        Dictionary with training results including CV metrics and saved paths
+    """
+    results = {}
+    start_time = time.time()
+    
+    # Update configuration with feature lists
+    cfg['hist_exog_list'] = hist_cols
+    cfg['futr_exog_list'] = futr_cols
+    cfg['stat_exog_list'] = stat_cols
+    
+    # Step 1: Instantiate NeuralForecast models from configuration
+    logger.info("="*70)
+    logger.info("STEP 1: Model Instantiation")
+    logger.info("="*70)
+    
+    try:
+        models = instantiate_models(cfg, verbose=True)
+        logger.info(f"Successfully instantiated {len(models)} models")
+        
+        # Create NeuralForecast instance
+        nf = NeuralForecast(
+            models=models,
+            freq=cfg.get('freq', '15min')
+        )
+        
+    except Exception as e:
+        logger.error(f"Model instantiation failed: {str(e)}")
+        raise RuntimeError(f"Failed to instantiate models: {str(e)}")
+    
+    # Step 2: Fit models once to store dataset (following spec lines 1777-1778)
+    logger.info("="*70)
+    logger.info("STEP 2: Initial Model Fitting")
+    logger.info("="*70)
+    
+    try:
+        fit_start = time.time()
+        logger.info(f"Fitting {len(models)} models with val_size={cfg['val_size']}...")
+        
+        nf.fit(df=nf_df, val_size=cfg['val_size'])
+        
+        fit_time = time.time() - fit_start
+        logger.info(f"✅ Model fitting completed in {fit_time:.1f} seconds")
+        
+    except Exception as e:
+        logger.error(f"Model fitting failed: {str(e)}")
+        
+        # Provide recovery suggestions
+        if "memory" in str(e).lower() or "oom" in str(e).lower():
+            logger.error("Suggestion: Reduce batch_size or input_size in configuration")
+        elif "cuda" in str(e).lower():
+            logger.error("Suggestion: Check GPU availability or use CPU by setting accelerator='cpu'")
+        
+        raise RuntimeError(f"Model fitting failed: {str(e)}")
+    
+    # Step 3: Optional insample predictions for diagnostics (spec lines 1780-1784)
+    logger.info("="*70)
+    logger.info("STEP 3: Insample Predictions (Optional)")
+    logger.info("="*70)
+    
+    try:
+        logger.info("Generating insample predictions for diagnostics...")
+        ins = nf.predict_insample(step_size=1, level=[10,20,30,40,50,60,70,80,90])
+        
+        # Merge y if needed
+        if "y" not in ins.columns:
+            ins = ins.merge(nf_df[["unique_id","ds","y"]], on=["unique_id","ds"], how="left")
+        
+        logger.info(f"Generated {len(ins)} insample predictions")
+        results['insample_predictions'] = ins
+        
+    except Exception as e:
+        logger.warning(f"Insample prediction failed (non-critical): {str(e)}")
+        results['insample_predictions'] = None
+    
+    # Step 4: Run NF-native temporal cross-validation (spec lines 1789-1790)
+    logger.info("="*70)
+    logger.info("STEP 4: Cross-Validation")
+    logger.info("="*70)
+    
+    try:
+        cv_start = time.time()
+        logger.info(f"Starting {cfg['n_windows']}-window cross-validation...")
+        
+        # Run CV with progress logging
+        cv_df = run_cv_with_progress(
+            nf=nf,
+            df=nf_df,
+            cfg=cfg,
+            use_conformal=use_conformal
+        )
+        
+        cv_time = time.time() - cv_start
+        logger.info(f"✅ Cross-validation completed in {cv_time:.1f} seconds")
+        
+        # Merge y for metrics if needed (spec lines 1792-1794)
+        if "y" not in cv_df.columns:
+            cv_df = cv_df.merge(nf_df[["unique_id","ds","y"]], on=["unique_id","ds"], how="left")
+        
+        results['cv_raw'] = cv_df
+        
+    except Exception as e:
+        logger.error(f"Cross-validation failed: {str(e)}")
+        
+        # Save partial results if available
+        if 'cv_df' in locals() and cv_df is not None and len(cv_df) > 0:
+            logger.info("Attempting to save partial CV results...")
+            partial_path = output_dir / f"cv_partial_h{cfg['h']}.parquet"
+            cv_df.to_parquet(partial_path)
+            logger.info(f"Partial results saved to {partial_path}")
+        
+        raise RuntimeError(f"Cross-validation failed: {str(e)}")
+    
+    # Step 5: Summarize CV results (spec line 1796)
+    logger.info("="*70)
+    logger.info("STEP 5: Results Summarization")
+    logger.info("="*70)
+    
+    try:
+        # Get model names for summarization
+        model_names = [model.__class__.__name__ for model in models]
+        
+        # Create model metadata for enhanced leaderboard
+        model_metadata = {}
+        for model in models:
+            model_name = model.__class__.__name__
+            model_metadata[model_name] = {
+                'loss_type': _get_loss_type(model),
+                'alias': getattr(model, 'alias', model_name)
+            }
+        
+        # Run comprehensive summarization
+        summary_results = summarize_cv(
+            cv_df=cv_df,
+            models=model_names,
+            h=cfg['h'],
+            output_dir=output_dir,
+            generate_plots=True,
+            model_metadata=model_metadata,
+            nf_instance=nf if save_models else None,
+            save_best_models=save_models
+        )
+        
+        results.update(summary_results)
+        
+        # Log leaderboard
+        if 'leaderboard' in summary_results and not summary_results['leaderboard'].empty:
+            logger.info("\n" + "="*70)
+            logger.info("MODEL LEADERBOARD")
+            logger.info("="*70)
+            for idx, row in summary_results['leaderboard'].head(5).iterrows():
+                logger.info(f"Rank {row['rank']}: {row['model']} - sCRPS: {row['sCRPS_mean']:.4f}")
+        
+    except Exception as e:
+        logger.error(f"Results summarization failed: {str(e)}")
+        raise RuntimeError(f"Failed to summarize results: {str(e)}")
+    
+    # Step 6: Persist artifacts (spec lines 1798-1800)
+    logger.info("="*70)
+    logger.info("STEP 6: Saving Artifacts")
+    logger.info("="*70)
+    
+    try:
+        # Create experiment directory
+        exp_dir = output_dir / f"experiments/h{cfg['h']}"
+        exp_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save CV raw results
+        cv_path = exp_dir / "cv_raw.parquet"
+        cv_df.to_parquet(cv_path)
+        logger.info(f"Saved CV results to {cv_path}")
+        
+        # Save leaderboard
+        if 'leaderboard' in results and not results['leaderboard'].empty:
+            leaderboard_path = exp_dir / "leaderboard.parquet"
+            results['leaderboard'].to_parquet(leaderboard_path)
+            logger.info(f"Saved leaderboard to {leaderboard_path}")
+        
+        # Save all other results
+        save_cv_results(results, exp_dir, cfg['h'])
+        
+        # Generate comprehensive markdown report
+        report_path = exp_dir / f"cv_summary_h{cfg['h']}.md"
+        generate_cv_summary_report(
+            results=results,
+            output_path=report_path,
+            horizon=cfg['h'],
+            use_conformal=use_conformal
+        )
+        logger.info(f"Generated summary report at {report_path}")
+        
+        # Save configuration used
+        config_path = exp_dir / "training_config.yaml"
+        with open(config_path, 'w') as f:
+            yaml.dump(cfg, f, default_flow_style=False)
+        logger.info(f"Saved configuration to {config_path}")
+        
+    except Exception as e:
+        logger.error(f"Failed to save artifacts: {str(e)}")
+        # Non-critical, continue
+    
+    # Calculate total training time
+    total_time = time.time() - start_time
+    results['training_time_seconds'] = total_time
+    
+    logger.info("="*70)
+    logger.info(f"TRAINING COMPLETE")
+    logger.info(f"Total time: {total_time:.1f} seconds ({total_time/60:.1f} minutes)")
+    logger.info("="*70)
+    
+    return results
+
+
+def run_cv_with_progress(
+    nf: NeuralForecast,
+    df: pd.DataFrame,
+    cfg: Dict[str, Any],
+    use_conformal: bool = False,
+    max_retries: int = 3
+) -> pd.DataFrame:
+    """Run CV with progress logging and retry logic for transient failures.
+    
+    Args:
+        nf: Fitted NeuralForecast instance
+        df: Canonical DataFrame
+        cfg: Configuration
+        use_conformal: Whether to use conformal prediction
+        max_retries: Maximum retry attempts for transient failures
+        
+    Returns:
+        CV results DataFrame
+    """
+    attempt = 0
+    last_error = None
+    
+    while attempt < max_retries:
+        try:
+            attempt += 1
+            if attempt > 1:
+                logger.info(f"Retry attempt {attempt}/{max_retries}...")
+            
+            # Run CV with the runner module
+            cv_df = run_cv(nf, df, cfg, use_conformal)
+            
+            # Success - return results
+            return cv_df
+            
+        except Exception as e:
+            last_error = e
+            error_str = str(e).lower()
+            
+            # Check if error is retryable
+            retryable_errors = ['timeout', 'connection', 'temporary', 'transient']
+            is_retryable = any(err in error_str for err in retryable_errors)
+            
+            if is_retryable and attempt < max_retries:
+                wait_time = attempt * 5  # Exponential backoff
+                logger.warning(f"Transient error encountered, retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+            else:
+                # Non-retryable error or max retries reached
+                break
+    
+    # All retries exhausted
+    raise RuntimeError(f"CV failed after {max_retries} attempts. Last error: {str(last_error)}")
+
+
+def _get_loss_type(model) -> str:
+    """Extract loss type from model configuration.
+    
+    Args:
+        model: NeuralForecast model instance
+        
+    Returns:
+        String describing the loss type
+    """
+    if hasattr(model, 'loss'):
+        loss = model.loss
+        if hasattr(loss, '__class__'):
+            loss_name = loss.__class__.__name__
+            if 'Distribution' in loss_name:
+                return 'StudentT'
+            elif 'MQ' in loss_name:
+                return 'MQLoss'
+            elif 'IQ' in loss_name:
+                return 'IQLoss'
+    return 'unknown'
+
+
 def main():
     """Main training pipeline entry point."""
     parser = argparse.ArgumentParser(description="BTC Forecasting Training Pipeline")
@@ -192,20 +575,45 @@ def main():
         help="Path to raw 1-minute CSV data"
     )
     parser.add_argument(
+        "--config",
+        default="experiments/h4.yaml",
+        help="Path to experiment configuration YAML"
+    )
+    parser.add_argument(
         "--output-dir",
         default="data/processed",
-        help="Output directory for processed data"
+        help="Output directory for processed data and results"
     )
     parser.add_argument(
         "--save-processed",
         action="store_true",
         help="Save processed data to disk"
     )
+    parser.add_argument(
+        "--skip-cv",
+        action="store_true",
+        help="Skip cross-validation (only process data)"
+    )
+    parser.add_argument(
+        "--use-conformal",
+        action="store_true",
+        help="Use conformal prediction for intervals"
+    )
+    parser.add_argument(
+        "--save-models",
+        action="store_true",
+        default=True,
+        help="Save best models after selection"
+    )
     
     args = parser.parse_args()
     
     try:
+        # Load experiment configuration
+        cfg = load_experiment_config(args.config)
+        
         # Execute complete data assembly path
+        logger.info("Starting data processing pipeline...")
         df_processed = load_and_process_data(args.raw_data)
         
         # Integrate feature engineering pipeline
@@ -214,33 +622,63 @@ def main():
         # Save processed data if requested
         if args.save_processed:
             saved_path = save_processed_data(nf_df, args.output_dir)
-            print(f"✅ Processing complete. Data saved to: {saved_path}")
-        else:
-            print("✅ Processing complete. Use --save-processed to save data.")
+            logger.info(f"✅ Data saved to: {saved_path}")
         
         # Show summary statistics
-        print("\n📊 Summary Statistics:")
-        print(f"   Total rows: {len(nf_df):,}")
-        print(f"   Date range: {nf_df['ds'].min()} to {nf_df['ds'].max()}")
-        print(f"   Non-NaN y values: {nf_df['y'].notna().sum():,}")
-        print(f"   Non-NaN y_train values: {nf_df['y_train'].notna().sum():,}")
-        print(f"   Total columns: {len(nf_df.columns)}")
+        logger.info("\n" + "="*70)
+        logger.info("DATA SUMMARY")
+        logger.info("="*70)
+        logger.info(f"Total rows: {len(nf_df):,}")
+        logger.info(f"Date range: {nf_df['ds'].min()} to {nf_df['ds'].max()}")
+        logger.info(f"Non-NaN y values: {nf_df['y'].notna().sum():,}")
+        logger.info(f"Non-NaN y_train values: {nf_df['y_train'].notna().sum():,}")
+        logger.info(f"Total columns: {len(nf_df.columns)}")
+        logger.info(f"Historical features: {len(hist_cols)}")
+        logger.info(f"Future features: {len(futr_cols)}")
+        logger.info(f"Static features: {len(stat_cols)}")
         
-        # Show sample of the data
-        print("\n🔍 Sample Data (first 5 rows):")
-        print(nf_df.head())
+        # Skip CV if requested (for testing data processing only)
+        if args.skip_cv:
+            logger.info("Skipping cross-validation as requested.")
+            return nf_df, hist_cols, futr_cols, stat_cols
         
-        # Store feature lists for model instantiation
-        # These would be passed to instantiate_models() in the next phase
-        print("\n📝 Feature lists ready for model instantiation:")
-        print(f"   hist_cols: {len(hist_cols)} features")
-        print(f"   futr_cols: {len(futr_cols)} features")
-        print(f"   stat_cols: {len(stat_cols)} features")
+        # Run training and cross-validation
+        output_dir = Path(args.output_dir)
+        results = train_and_evaluate(
+            nf_df=nf_df,
+            hist_cols=hist_cols,
+            futr_cols=futr_cols,
+            stat_cols=stat_cols,
+            cfg=cfg,
+            output_dir=output_dir,
+            use_conformal=args.use_conformal,
+            save_models=args.save_models
+        )
         
-        return nf_df, hist_cols, futr_cols, stat_cols
+        # Print final summary
+        logger.info("\n" + "="*70)
+        logger.info("FINAL SUMMARY")
+        logger.info("="*70)
+        
+        if 'leaderboard' in results and not results['leaderboard'].empty:
+            best_model = results['leaderboard'].iloc[0]
+            logger.info(f"Best Model: {best_model['model']}")
+            logger.info(f"Best sCRPS: {best_model['sCRPS_mean']:.4f}")
+        
+        if 'saved_models' in results:
+            logger.info(f"\nSaved Models:")
+            for key, path in results['saved_models'].items():
+                logger.info(f"  {key}: {path}")
+        
+        logger.info(f"\nTotal Training Time: {results.get('training_time_seconds', 0):.1f} seconds")
+        logger.info("\n✅ Training pipeline completed successfully!")
+        
+        return results
         
     except Exception as e:
-        print(f"❌ Training pipeline failed: {e}")
+        logger.error(f"❌ Training pipeline failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         sys.exit(1)
 
 
