@@ -21,6 +21,15 @@
         "-y",
         "@upstash/context7-mcp"
       ]
+    },
+    "thundercompute": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@mintlify/mcp@latest",
+        "thundercompute"
+      ]
     }
   }
 }
