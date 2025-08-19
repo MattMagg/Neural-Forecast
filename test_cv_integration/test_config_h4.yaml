@@ -1,0 +1,40 @@
+freq: 15min
+futr_exog_list: []
+h: 4
+hist_exog_list: []
+models:
+- NHITS:
+    alias: NHITS_test
+    batch_size: 32
+    early_stop_patience_steps: 20
+    h: 4
+    input_size: 96
+    learning_rate: 0.001
+    loss:
+      kind: studentt
+    max_steps: 100
+    val_check_steps: 10
+- TIDE:
+    alias: TiDE_test
+    batch_size: 32
+    early_stop_patience_steps: 20
+    h: 4
+    hidden_size: 128
+    input_size: 96
+    learning_rate: 0.001
+    loss:
+      kind: mqloss
+      level:
+      - 80
+      - 90
+      - 95
+    max_steps: 100
+    num_decoder_layers: 1
+    num_encoder_layers: 1
+    val_check_steps: 10
+n_windows: 3
+refit: true
+seed: 42
+stat_exog_list: []
+step_size: 4
+val_size: 16

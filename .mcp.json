@@ -22,14 +22,12 @@
         "@upstash/context7-mcp"
       ]
     },
-    "thundercompute": {
-      "type": "stdio",
+    "firecrawl-mcp": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@mintlify/mcp@latest",
-        "thundercompute"
-      ]
+      "args": ["-y", "firecrawl-mcp"],
+      "env": {
+      "FIRECRAWL_API_KEY": "fc-135b26fec6d246bd9d1985817b1c6f6d"
+      }
     }
   }
 }

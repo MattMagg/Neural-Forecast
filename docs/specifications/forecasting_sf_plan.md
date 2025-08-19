@@ -1967,7 +1967,7 @@ All names in the PatchTST signature (includes `patch_len`, `stride`, `n_heads`, 
 **Goal:** keep variance low; stop when gains flatten. Use **NF cross_validation** exactly as in §5.
 
 1. **Pilot (cheap)**
-
+\
    - Horizon: **h=16** only.
    - Windows: **n_windows=3**, `step_size=16`, `val_size=64`, `refit=1`.
    - Sweep **at most 6–8 configs per model** using the ranges above.

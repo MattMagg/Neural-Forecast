@@ -1,6 +1,6 @@
 # SuperClaude Agent Usage Guide (Repo-Focused)
 
-> Purpose: Convert any user task or draft prompt into the optimal SuperClaude command + flags for this Neural-Forecast repository, minimizing tokens while activating the right specialists.
+> Purpose: Convert any user task or draft prompt into the optimal SuperClaude command + flags for this Neural-Forecast repository while activating the most efficient and optimal specialists for the objective of the prompt in provided below.
 
 ## Global Rules for Agents
 - Prefer one precise command with targeted flags over generic chatter.
