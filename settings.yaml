@@ -1,0 +1,55 @@
+# Neural-Forecast Global Settings
+freq: "15min"
+horizons: [4, 8, 16, 32]
+seed: 1337
+
+# Winsorization for extreme values
+winsor:
+  lower_q: 0.001
+  upper_q: 0.999
+
+# Model-specific input sizes
+default_input_size:
+  generic: 1024
+  PatchTST: 2048
+
+# Scaler configuration
+scaler_type:
+  default: robust
+  PatchTST: revin
+
+# Data paths
+data:
+  raw_path: "data/raw/btcusd_1-min_data.csv"
+  processed_path: "data/processed/"
+
+# Feature configuration
+features:
+  max_features: 256
+  mtf_horizons: ["30min", "1h", "4h"]
+
+# Cross-validation settings
+cv:
+  n_windows: 6
+  step_size: null  # Set to horizon
+  val_size: 16  # 4 hours
+
+# Model training
+training:
+  batch_size: 256
+  batch_size_fallback: 128
+  max_epochs: 100
+  early_stop_patience: 10
+
+# GPU configuration
+gpu:
+  memory_config: "max_split_size_mb:512"
+  enable_memory_snapshot: true
+
+# Modal configuration
+modal:
+  app_name: "neural-forecast-btc"
+  gpu_type: "A100-80GB"
+  timeout_hours: 4
+  max_retries: 3
+  initial_delay: 0.0

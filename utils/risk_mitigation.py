@@ -355,10 +355,19 @@ class QuantileCrossingFixer:
 class GPUMemoryManager:
     """Manage GPU memory and handle OOM issues."""
     
-    def __init__(self):
-        """Initialize GPU memory manager."""
+    def __init__(self, initial_batch_size: int = 256, fallback_batch_size: int = 128):
+        """
+        Initialize GPU memory manager.
+        
+        Args:
+            initial_batch_size: Starting batch size
+            fallback_batch_size: Reduced batch size for OOM recovery
+        """
         self.initial_config = {}
         self.recovery_history = []
+        self.current_batch_size = initial_batch_size
+        self.fallback_batch_size = fallback_batch_size
+        self.batch_reduction_count = 0
         
     def get_gpu_memory_info(self) -> Dict[str, float]:
         """
@@ -510,6 +519,29 @@ class GPUMemoryManager:
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
             logger.debug("Cleared GPU cache")
+    
+    def can_reduce_batch_size(self) -> bool:
+        """Check if batch size can be reduced further."""
+        return self.batch_reduction_count < 3 and self.current_batch_size > 16
+    
+    def monitor(self):
+        """Context manager for GPU memory monitoring."""
+        from contextlib import contextmanager
+        
+        @contextmanager
+        def _monitor():
+            try:
+                yield self
+            except torch.cuda.OutOfMemoryError as e:
+                logger.error(f"GPU OOM detected: {e}")
+                self.clear_cache()
+                if self.can_reduce_batch_size():
+                    self.current_batch_size = self.fallback_batch_size
+                    self.batch_reduction_count += 1
+                    logger.info(f"Reduced batch size to {self.current_batch_size}")
+                raise
+        
+        return _monitor()
             
 
 class RiskMitigationOrchestrator:

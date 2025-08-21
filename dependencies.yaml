@@ -1,0 +1,94 @@
+python_version: "3.13.6"
+
+# =============================================================================
+# CORE MACHINE LEARNING & FORECASTING
+# =============================================================================
+core_ml:
+  neuralforecast: "3.0.2"        # Latest (Jun 17, 2025) - MAJOR BREAKING CHANGES
+  torch: "2.8.0"                 # Latest (Aug 6, 2025)
+  pytorch-lightning: "2.5.3"     # Latest stable
+
+# =============================================================================
+# DATA PROCESSING & MANIPULATION
+# =============================================================================
+data_processing:
+  pandas: "2.3.1"                # Latest (Jul 7, 2025)
+  numpy: "2.3.2"                 # Latest (Jul 24, 2025) - Major version
+  pyarrow: "20.0.0"              # Latest (Apr 27, 2025)
+
+# =============================================================================
+# FEATURE ENGINEERING & TECHNICAL ANALYSIS
+# =============================================================================
+feature_engineering:
+  vectorbt: "0.28.0"             # Latest stable
+  TA-Lib: "0.6.5"                # Latest - Supports numpy 2
+  pandas-ta: "0.3.14b"           # Original (old, consider alternatives)
+  pandas-ta-openbb: "0.4.22"     # Alternative (Jul 5, 2025) - NumPy 2 compatible
+  freqtrade: "2025.7"            # Latest (Aug 14, 2025)
+
+# =============================================================================
+# MACHINE LEARNING UTILITIES
+# =============================================================================
+ml_utilities:
+  scikit-learn: "1.7.1"          # Latest (Jul 18, 2025)
+  statsmodels: "0.14.5"          # Latest (Jul 7, 2025)
+
+# =============================================================================
+# VISUALIZATION & PLOTTING
+# =============================================================================
+visualization:
+  matplotlib: "3.10.5"           # Latest (Jul 31, 2025)
+  seaborn: "0.13.2"              # Latest stable
+  plotly: "6.3.0"                # Latest
+
+# =============================================================================
+# JUPYTER NOTEBOOKS & EXECUTION
+# =============================================================================
+notebooks:
+  jupyter: "1.1.1"               # Metapackage
+  notebook: "7.4.5"              # Latest Jupyter Notebook
+  papermill: "2.6.0"             # Latest
+  nbconvert: "7.16.6"            # Latest
+  ipykernel: "6.30.1"            # Latest (Aug 4, 2025)
+
+# =============================================================================
+# CLOUD INFRASTRUCTURE & DEPLOYMENT
+# =============================================================================
+infrastructure:
+  modal: "1.1.3"                 # Latest (Aug 19, 2025)
+
+# =============================================================================
+# UTILITIES & HELPERS
+# =============================================================================
+utilities:
+  pyyaml: "6.0.2"                # Latest (Aug 6, 2024)
+  joblib: "1.5.1"                # Latest (May 23, 2025)
+  tqdm: "4.67.1"                 # Latest (Nov 24, 2024)
+  GPUtil: "1.4.0"                # Latest stable
+
+# =============================================================================
+# TESTING & QUALITY ASSURANCE
+# =============================================================================
+testing:
+  pytest: "8.4.1"                # Latest (Jun 18, 2025)
+  pytest-cov: "6.0.0"            # Latest (Jun 12, 2025)
+
+# =============================================================================
+# INSTALLATION ORDER (IMPORTANT)
+# =============================================================================
+installation_notes:
+  critical_order: |
+    # MUST install in this order to avoid conflicts:
+    1. pip install numpy==2.3.2
+    2. pip install pandas==2.3.1 pyarrow==20.0.0
+    3. pip install torch==2.8.0
+    4. pip install neuralforecast==3.0.2
+    5. pip install scikit-learn==1.7.1
+    6. Install TA-Lib C library FIRST, then pip install TA-Lib==0.6.5
+    7. pip install remaining packages
+  
+  ta_lib_installation: |
+    # TA-Lib requires C library first:
+    # macOS: brew install ta-lib
+    # Ubuntu: sudo apt-get install ta-lib
+    # Then: pip install TA-Lib==0.6.5
