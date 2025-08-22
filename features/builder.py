@@ -1,7 +1,10 @@
 # features/builder.py
 from __future__ import annotations
 import itertools, numpy as np, pandas as pd
-import pandas_ta as pta
+try:
+    import pandas_ta_openbb as pta  # NumPy 2 compatible fork
+except ImportError:
+    import pandas_ta as pta  # Fallback to original if openbb not available
 import vectorbt as vbt
 from typing import Dict, List, Tuple
 from .registry import REGISTRY, MTF_TARGETS, IndicatorSpec

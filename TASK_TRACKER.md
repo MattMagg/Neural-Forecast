@@ -25,9 +25,9 @@ When updating this document:
 
 ---
 
-## Project Version: 0.5.2.0
+## Project Version: 0.5.2.1
 
-**Last Updated**: 2025-08-22
+**Last Updated**: 2025-01-22
 
 ## Specifications Status
 
@@ -546,6 +546,10 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 ---
 
 ## Changelog
+
+### [0.5.2.1] - 2025-01-22
+- Analyzed and documented file usage across all project directories
+- Identified which files are actively used vs development tools in the training pipeline
 
 ### [0.5.2.0] - 2025-08-22
 - **Training Guide Foundation Workflow Update - COMPLETED**

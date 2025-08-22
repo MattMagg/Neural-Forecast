@@ -3,6 +3,15 @@
 ## Project Overview
 Intraday BTC forecasting system using 15-minute bars with calibrated prediction intervals. Built with a **NeuralForecast-centric** approach - no custom implementations where NF provides native functionality.
 
+## Test Files
+
+### ❌ **test_cv_integration.py** (NOT USED IN TRAINING)
+- **Purpose**: Standalone test script for CV integration
+- **Features**: Creates synthetic data, tests full pipeline, verifies outputs
+- **Status**: Development/testing tool only
+- **Location**: Project root
+- **Note**: Not imported or executed by run_train.ipynb
+
 ## Role and Objective
 - Design and implement a forecasting architecture that is lean, pragmatic, and strictly aligned with project guidelines and core documentation.
 
