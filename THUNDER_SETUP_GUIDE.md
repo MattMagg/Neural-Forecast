@@ -8,6 +8,7 @@ Thunder Compute instances come with these components pre-installed:
 
 - **CUDA 12.9** - GPU compute platform
 - **CUDNN 9.0** - Deep learning primitives
+- **Python** - Python interpreter with pip package manager
 - **PyTorch 2.7.1** - Machine learning framework (setup script upgrades to 2.8.0)
 - **JupyterLab** - Interactive development environment
 - **Docker** - Container platform (see Thunder Compute Docker guide)
@@ -30,11 +31,10 @@ chmod +x setup.sh
 This installs:
 
 - System packages (build tools, development libraries)
-- Python 3.13.6 and pip
 - Node.js and Claude Code for AI-assisted development
 - TA-Lib C library for technical analysis
 - All Python dependencies in correct order (upgrades PyTorch to 2.8.0)
-- Creates virtual environment and project structure
+- Creates virtual environment with pre-installed Python and project structure
 
 ## 3. Verify Setup
 

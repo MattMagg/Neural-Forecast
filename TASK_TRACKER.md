@@ -3,6 +3,7 @@
 ## Update Instructions
 
 When updating this document:
+
 1. Provide enough detail for other agents to understand what was implemented
 2. Include file paths and function/class names created
 3. Add tags to indicate task type
@@ -25,6 +26,7 @@ When updating this document:
 ---
 
 ## Project Version: 0.5.1.3
+
 **Last Updated**: 2025-08-22
 
 ## Specifications Status
@@ -42,6 +44,7 @@ When updating this document:
 ---
 
 ## Data Processing Validation Spec
+
 **Status**: COMPLETED  
 **Version**: 0.1.0  
 **Spec Location**: `.kiro/specs/data-processing-validation/`
@@ -76,6 +79,7 @@ When updating this document:
   - All 10 requirements from spec passed testing
 
 ### Files Created/Modified
+
 - `utils/io.py` - Data I/O and processing (7 functions)
 - `utils/validate.py` - Validation suite (4 functions)
 - `run_train.py` - Training pipeline entry point
@@ -83,6 +87,7 @@ When updating this document:
 ---
 
 ## Feature Engineering Pipeline Spec
+
 **Status**: COMPLETED  
 **Version**: 0.3.0  
 **Spec Location**: `.kiro/specs/feature-engineering-pipeline/`
@@ -90,7 +95,7 @@ When updating this document:
 ### Task Completion
 
 - [x] **Task 1**: Registry creation **[CONFIG]**
-  - `features/registry.py`: 
+  - `features/registry.py`:
     - `IndicatorSpec` dataclass with fields: name, lib, func, params, inputs, kind, tf, post
     - `REGISTRY` list with 13 indicators (RSI, ROC, STOCH, MACD, ATR, nvol, OBV, MFI, BBANDS, Donchian, calendar features)
     - `MTF_TARGETS` dict: 30min [rsi,roc,atr,bbands], 1h [rsi,roc,atr,bbands,macd], 4h [rsi,atr,bbands]
@@ -141,6 +146,7 @@ When updating this document:
     - Plus 2 additional boundary case tests
 
 ### Files Created/Modified
+
 - `features/registry.py` - Indicator specifications and MTF targets
 - `features/builder.py` - Complete feature computation pipeline (8 functions)
 - `run_train.py` - Modified with feature integration
@@ -151,6 +157,7 @@ When updating this document:
 ---
 
 ## NeuralForecast Model Factory Spec
+
 **Status**: COMPLETED  
 **Version**: 0.4.0  
 **Spec Location**: `.kiro/specs/neuralforecast-model-factory/`
@@ -207,6 +214,7 @@ When updating this document:
   - Quality dashboard shows all green
 
 ### Files Created/Modified
+
 - `nf_models/factory.py` - Model instantiation system (905 lines)
 - `nf_models/factory_core.py` - Exported Python module
 - `nf_models/01_model_factory_core.ipynb` - Core implementation notebook
@@ -221,6 +229,7 @@ When updating this document:
 - `experiments/h32.yaml` - 8-hour horizon config
 
 ### Validation Issues Fixed **[VALIDATION]**
+
 After nf-validation-expert agent review, 4 critical issues were identified and resolved:
 
 - **Issue 1: PatchTST Exogenous Support**
@@ -242,6 +251,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 ---
 
 ## Cross-Validation and Metrics Spec
+
 **Status**: COMPLETED  
 **Version**: 0.5.0  
 **Spec Location**: `.kiro/specs/cross-validation-metrics/`
@@ -317,6 +327,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
     - `05_performance_tuning.ipynb` - Optimization strategies
 
 ### Risk Mitigation Implementation **[SCRIPT]**
+
 - `utils/error_recovery.py`: Comprehensive error handling protocols
   - Memory exhaustion: Progressive batch_size reduction, GPU monitoring
   - sCRPS failures: Numerical stability checks, fallback strategies
@@ -327,6 +338,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
   - Quantile crossing prevention, GPU memory management
 
 ### Files Created/Modified
+
 - `cv/runner.py` - Core CV execution and orchestration (850+ lines)
 - `cv/__init__.py` - Module exports and organization
 - `uq/metrics.py` - Metrics computation system (600+ lines)
@@ -344,7 +356,9 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 - `examples/cv/*.ipynb` - 5 example notebooks
 
 ### Acceptance Validation **[VALIDATION]**
+
 **Status**: 100% PASS - All 10 requirements and 80 acceptance criteria met
+
 - NF-native implementation: Uses `NeuralForecast.cross_validation()` exclusively
 - sCRPS as primary metric: Correct NF implementation with distributional/quantile support
 - Coverage diagnostics: ±2pp tolerance validation at 80/90/95% levels
@@ -358,6 +372,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 ---
 
 ## Notebook Conversion Workflow
+
 **Status**: COMPLETED  
 **Version**: 0.5.1  
 **Spec Location**: `docs/notebook_conversion_workflow.md`
@@ -382,6 +397,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
     - Execution readiness confirmed
   
 ### Files Created
+
 - `run_train.ipynb` - Training pipeline notebook
 - `run_predict.ipynb` - Prediction pipeline notebook
 - `test_cv_integration.ipynb` - CV testing notebook
@@ -389,6 +405,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 - `NOTEBOOK_VALIDATION_REPORT.md` - Comprehensive validation report
 
 ### Key Features Implemented
+
 - Replaced argparse with notebook configuration cells
 - Added standardized path variables at notebook top
 - Organized code into logical cells with markdown headers
@@ -399,6 +416,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 ---
 
 ## Infrastructure and Documentation Updates
+
 **Status**: COMPLETED  
 **Version**: 0.5.1.2  
 **Period**: 2025-08-19 to 2025-08-22
@@ -449,6 +467,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
   - Enables one-command deployment on fresh Thunder Compute instances
 
 ### Files Created/Modified
+
 - `setup.sh` - Thunder Compute automated setup script
 - `THUNDER_SETUP_GUIDE.md` - Quick deployment guide
 - `.kiro/specs/thunder-compute-setup/design.md` - Architecture specification
@@ -461,6 +480,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 ---
 
 ## Thunder Compute Setup Spec
+
 **Status**: COMPLETED  
 **Version**: 0.5.1.3  
 **Spec Location**: `.kiro/specs/thunder-compute-setup/`
@@ -501,6 +521,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
   - Validation and testing utilities compatible with pre-installed software
 
 ### Files Created/Modified
+
 - `setup.sh` - Thunder Compute automated setup script (optimized for pre-installed software)
 - `TRAINING_GUIDE.md` - A100XL training guide (updated for pre-installed environment)
 - `THUNDER_SETUP_GUIDE.md` - Quick setup guide (removed CUDA installation steps)
@@ -512,6 +533,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 - `.kiro/specs/thunder-compute-setup/tasks.md` - Implementation task breakdown
 
 ### Key Updates for Pre-installed Software **[INFRA]**
+
 - **CUDA 12.9 Compatibility**: No CUDA installation, compatibility checks only
 - **PyTorch Upgrade**: From pre-installed 2.7.1 to 2.8.0 for better CUDA 12.9 support
 - **JupyterLab Integration**: Uses pre-installed JupyterLab, no installation needed
@@ -525,6 +547,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 ## Changelog
 
 ### [0.5.1.3] - 2025-08-22
+
 - **Thunder Compute Pre-installed Software Compatibility Update**
 - Updated all setup scripts and documentation for Thunder Compute's pre-installed software
 - Modified setup.sh to work with CUDA 12.9, PyTorch 2.7.1, JupyterLab, Docker pre-installed
@@ -534,6 +557,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 - Completed Thunder Compute setup specification (3/3 tasks)
 
 ### [0.5.1.2] - 2025-08-22
+
 - Added Thunder Compute setup automation with one-command deployment
 - Created automated setup script for A100XL instances with Python 3.13, CUDA, and dependencies
 - Integrated Modal GPU infrastructure for serverless GPU orchestration
@@ -544,6 +568,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 - Enhanced infrastructure configurations for multiple GPU providers
 
 ### [0.5.1] - 2025-08-19
+
 - Completed notebook conversion workflow (4/4 notebooks)
 - Converted all Python scripts to Jupyter notebooks
 - Maintained 100% functionality preservation
@@ -551,6 +576,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 - All notebooks production-ready with proper structure
 
 ### [0.5.0] - 2025-08-16
+
 - Completed Cross-Validation and Metrics specification (20/20 tasks)
 - Implemented NF-native cross-validation with sCRPS as primary metric
 - Added comprehensive coverage and PIT calibration diagnostics
@@ -564,6 +590,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 - System approved for production deployment
 
 ### [0.4.1] - 2025-08-15
+
 - Fixed 4 critical issues identified by nf-validation-expert agents
 - Resolved PatchTST exogenous support incompatibility
 - Added missing return_params=True to DistributionLoss
@@ -571,6 +598,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 - Replaced simulated metrics with real calculations in acceptance criteria
 
 ### [0.4.0] - 2025-08-15
+
 - Completed NeuralForecast model factory specification (Tasks 11-16)
 - Converted implementation to Jupyter notebooks for Mac M4 Pro development
 - Added comprehensive integration tests, performance profiling, and documentation
@@ -578,16 +606,21 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 - System ready for A100 production deployment
 
 ### [0.3.0] - 2025-08-15
+
 - Completed feature engineering pipeline: integration, testing, validation (Tasks 6-8)
 
 ### [0.2.0] - 2025-08-15  
+
 - Added feature engineering pipeline: registry, computation, MTF, selection (Tasks 1-5)
 
 ### [0.1.5] - 2025-08-15
+
 - Added NeuralForecast model factory with 4 models and 3 loss types (Tasks 1-10)
 
 ### [0.1.0] - 2025-08-15
+
 - Completed data processing validation pipeline with all utilities and tests
 
 ### [0.0.0] - Initial
+
 - Project initialization and planning phase

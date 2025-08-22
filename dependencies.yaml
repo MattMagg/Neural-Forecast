@@ -6,6 +6,7 @@ python_version: "3.13.6"
 preinstalled:
   cuda: "12.9"                    # Pre-installed on Thunder Compute
   cudnn: "9.0"                    # Pre-installed on Thunder Compute  
+  python: "latest"                # Pre-installed Python with pip
   pytorch_base: "2.7.1"          # Pre-installed (will upgrade to 2.8.0)
   jupyterlab: "latest"            # Pre-installed
   numpy: "latest"                 # Pre-installed (scientific Python libraries)
@@ -89,18 +90,19 @@ testing:
 # =============================================================================
 installation_notes:
   thunder_compute_setup: |
-    # Thunder Compute has CUDA 12.9, PyTorch 2.7.1, JupyterLab, NumPy, Pandas pre-installed
+    # Thunder Compute has CUDA 12.9, Python, PyTorch 2.7.1, JupyterLab, NumPy, Pandas pre-installed
     # Setup script will upgrade PyTorch to 2.8.0 for better CUDA 12.9 compatibility
     
   critical_order: |
     # MUST install in this order to avoid conflicts with pre-installed packages:
-    1. pip install numpy (use compatible version with pre-installed base)
-    2. pip install pandas pyarrow (use compatible versions)
-    3. pip install --upgrade torch==2.8.0 (upgrade from pre-installed 2.7.1)
-    4. pip install neuralforecast==3.0.2
-    5. pip install scikit-learn==1.7.1
-    6. Install TA-Lib C library FIRST, then pip install TA-Lib==0.6.5
-    7. pip install remaining packages
+    1. python3 -m pip install --upgrade pip (upgrade pre-installed pip)
+    2. pip install numpy (use compatible version with pre-installed base)
+    3. pip install pandas pyarrow (use compatible versions)
+    4. pip install --upgrade torch==2.8.0 (upgrade from pre-installed 2.7.1)
+    5. pip install neuralforecast==3.0.2
+    6. pip install scikit-learn==1.7.1
+    7. Install TA-Lib C library FIRST, then pip install TA-Lib==0.6.5
+    8. pip install remaining packages
   
   ta_lib_installation: |
     # TA-Lib requires C library first:

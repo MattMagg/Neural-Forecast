@@ -5,7 +5,6 @@ set -e
 # Optimized for Thunder Compute instances with pre-installed CUDA 12.9, PyTorch 2.7.1, JupyterLab
 
 # Configuration
-PYTHON_VERSION="3.13.6"
 PROJECT_DIR="/home/ubuntu/Neural-Forecast"
 VENV_DIR=".venv"
 LOG_FILE="setup.log"
@@ -14,6 +13,7 @@ LOG_FILE="setup.log"
 PREINSTALLED_CUDA="12.9"
 PREINSTALLED_PYTORCH="2.7.1"
 PREINSTALLED_CUDNN="9.0"
+PREINSTALLED_PYTHON="pre-installed"
 
 # Colors for output
 RED='\033[0;31m'
@@ -105,12 +105,10 @@ if [ "$DRY_RUN" = true ]; then
     dry_run "curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -"
     dry_run "sudo apt install -y nodejs"
     dry_run "npm install -g @anthropic-ai/claude-code"
-    dry_run "sudo add-apt-repository ppa:deadsnakes/ppa -y"
-    dry_run "sudo apt install -y python3.13 python3.13-dev python3.13-venv python3.13-distutils"
-    dry_run "curl -sS https://bootstrap.pypa.io/get-pip.py | python3.13"
+    dry_run "python3 -m pip install --upgrade pip"
     dry_run "sudo apt install -y libta-lib-dev (or compile from source)"
     dry_run "git clone -b v0.5.1.2 https://github.com/MattMagg/Neural-Forecast.git"
-    dry_run "python3.13 -m venv .venv"
+    dry_run "python3 -m venv .venv"
     dry_run "source .venv/bin/activate"
     dry_run "pip install numpy (compatible with pre-installed PyTorch)"
     dry_run "pip install pandas pyarrow (compatible versions)"
@@ -128,9 +126,8 @@ if [ "$DRY_RUN" = true ]; then
 fi
 
 log "Starting Thunder Compute setup for BTC Forecasting System..."
-log "Target Python version: $PYTHON_VERSION"
 log "Project directory: $PROJECT_DIR"
-log "Pre-installed: CUDA $PREINSTALLED_CUDA, PyTorch $PREINSTALLED_PYTORCH, CUDNN $PREINSTALLED_CUDNN"
+log "Pre-installed: CUDA $PREINSTALLED_CUDA, PyTorch $PREINSTALLED_PYTORCH, CUDNN $PREINSTALLED_CUDNN, Python $PREINSTALLED_PYTHON"
 
 # Install system packages
 log "Installing system packages..."
@@ -147,14 +144,9 @@ sudo apt install -y nodejs
 log "Installing Claude Code..."
 npm install -g @anthropic-ai/claude-code
 
-# Install Python 3.13.6
-log "Installing Python $PYTHON_VERSION..."
-sudo add-apt-repository ppa:deadsnakes/ppa -y
-sudo apt update
-sudo apt install -y python3.13 python3.13-dev python3.13-venv python3.13-distutils
-
-# Get pip for Python 3.13
-curl -sS https://bootstrap.pypa.io/get-pip.py | python3.13
+# Upgrade pip for pre-installed Python
+log "Upgrading pip for pre-installed Python..."
+python3 -m pip install --upgrade pip
 
 # Check pre-installed CUDA (Thunder Compute has CUDA 12.9 pre-installed)
 log "Checking pre-installed CUDA..."
@@ -212,9 +204,9 @@ if [ "$current_branch" != "v0.5.1.2" ]; then
 fi
 
 # Create virtual environment
-log "Creating virtual environment..."
+log "Creating virtual environment with pre-installed Python..."
 
-python3.13 -m venv "$VENV_DIR"
+python3 -m venv "$VENV_DIR"
 # shellcheck disable=SC1091
 source "$VENV_DIR/bin/activate"
 
