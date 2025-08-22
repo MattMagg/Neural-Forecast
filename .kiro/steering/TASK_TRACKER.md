@@ -24,7 +24,7 @@ When updating this document:
 
 ---
 
-## Project Version: 0.5.1.3
+## Project Version: 0.5.1.2
 **Last Updated**: 2025-08-22
 
 ## Specifications Status
@@ -37,7 +37,6 @@ When updating this document:
 | cross-validation-metrics | COMPLETED | 20/20 | NF-native CV, sCRPS metrics, calibration diagnostics |
 | notebook-conversion | COMPLETED | 4/4 | Converted scripts to Jupyter notebooks |
 | infrastructure-setup | COMPLETED | 6/6 | Thunder Compute & Modal GPU setup, documentation reorganization |
-| thunder-compute-setup | COMPLETED | 3/3 | Pre-installed software compatibility, setup automation |
 
 ---
 
@@ -460,78 +459,7 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 
 ---
 
-## Thunder Compute Setup Spec
-**Status**: COMPLETED  
-**Version**: 0.5.1.3  
-**Spec Location**: `.kiro/specs/thunder-compute-setup/`
-
-### Task Completion
-
-- [x] **Task 1**: Create Thunder Compute setup script **[SCRIPT]** **[INFRA]**
-  - `setup.sh`: Complete automated setup script optimized for Thunder Compute A100XL
-    - Pre-installed software detection (CUDA 12.9, PyTorch 2.7.1, JupyterLab)
-    - System packages installation (build tools, development libraries)
-    - Python 3.13.6 installation from deadsnakes PPA
-    - Node.js LTS and Claude Code installation for AI-assisted development
-    - TA-Lib C library installation (apt or compile from source)
-    - Virtual environment creation and dependency management
-    - PyTorch upgrade from 2.7.1 to 2.8.0 for CUDA 12.9 compatibility
-    - Repository cloning and project structure creation
-    - Comprehensive validation and GPU testing
-    - Dry-run mode for safe testing
-
-- [x] **Task 2**: Create practical training guide **[DOC]**
-  - `TRAINING_GUIDE.md`: Complete A100XL training guide updated for pre-installed environment
-    - Pre-installed software section documenting CUDA 12.9, PyTorch 2.7.1, JupyterLab
-    - Optimal batch sizes for 80GB VRAM (512 default, 256 fallback)
-    - A100XL-specific memory configurations and environment variables
-    - Training performance estimates and expected times
-    - GPU monitoring commands (nvidia-smi, gpustat, watch)
-    - Comprehensive troubleshooting section for common issues
-    - Performance optimization tips and memory management
-    - Configuration file examples and workflow guidance
-
-- [x] **Task 3**: Create cleanup and utility scripts **[SCRIPT]** **[INFRA]**
-  - `cleanup.sh`: Multi-mode cleanup script for failed installations
-    - Virtual environment cleanup
-    - Python package cleanup
-    - CUDA compatibility reset (no driver removal needed)
-    - Fresh start capability with multiple cleanup modes
-  - Docker testing integration with `test_setup_docker.sh`
-  - Validation and testing utilities compatible with pre-installed software
-
-### Files Created/Modified
-- `setup.sh` - Thunder Compute automated setup script (optimized for pre-installed software)
-- `TRAINING_GUIDE.md` - A100XL training guide (updated for pre-installed environment)
-- `THUNDER_SETUP_GUIDE.md` - Quick setup guide (removed CUDA installation steps)
-- `dependencies.yaml` - Updated with pre-installed software compatibility notes
-- `cleanup.sh` - Multi-mode cleanup script
-- `test_setup_docker.sh` - Docker container testing script
-- `.kiro/specs/thunder-compute-setup/requirements.md` - Requirements specification
-- `.kiro/specs/thunder-compute-setup/design.md` - Architecture and design decisions
-- `.kiro/specs/thunder-compute-setup/tasks.md` - Implementation task breakdown
-
-### Key Updates for Pre-installed Software **[INFRA]**
-- **CUDA 12.9 Compatibility**: No CUDA installation, compatibility checks only
-- **PyTorch Upgrade**: From pre-installed 2.7.1 to 2.8.0 for better CUDA 12.9 support
-- **JupyterLab Integration**: Uses pre-installed JupyterLab, no installation needed
-- **Docker Support**: Leverages pre-installed Docker for containerized testing
-- **Scientific Libraries**: Compatible with pre-installed NumPy, Pandas, etc.
-- **No Reboot Required**: Removed driver installation eliminates reboot requirement
-- **Streamlined Setup**: Reduced setup time by leveraging pre-installed components
-
----
-
 ## Changelog
-
-### [0.5.1.3] - 2025-08-22
-- **Thunder Compute Pre-installed Software Compatibility Update**
-- Updated all setup scripts and documentation for Thunder Compute's pre-installed software
-- Modified setup.sh to work with CUDA 12.9, PyTorch 2.7.1, JupyterLab, Docker pre-installed
-- Updated TRAINING_GUIDE.md to reflect pre-installed environment and remove driver installation
-- Updated dependencies.yaml with pre-installed software section and compatibility notes
-- Updated THUNDER_SETUP_GUIDE.md to remove CUDA installation and reboot requirements
-- Completed Thunder Compute setup specification (3/3 tasks)
 
 ### [0.5.1.2] - 2025-08-22
 - Added Thunder Compute setup automation with one-command deployment

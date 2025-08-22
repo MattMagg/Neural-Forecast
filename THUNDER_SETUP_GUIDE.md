@@ -2,22 +2,25 @@
 
 Quick setup guide for BTC forecasting system on Thunder Compute A100XL instance.
 
-## 1. Install Python 3.13
+## Pre-installed Software ✅
+
+Thunder Compute instances come with these components pre-installed:
+
+- **CUDA 12.9** - GPU compute platform
+- **CUDNN 9.0** - Deep learning primitives
+- **PyTorch 2.7.1** - Machine learning framework (setup script upgrades to 2.8.0)
+- **JupyterLab** - Interactive development environment
+- **Docker** - Container platform (see Thunder Compute Docker guide)
+- **Scientific Python Libraries** - NumPy, Pandas, etc.
+
+## 1. Clone Repository
 
 ```bash
-sudo add-apt-repository ppa:deadsnakes/ppa -y
-sudo apt update
-sudo apt install -y python3.13 python3.13-dev python3.13-pip
-```
-
-## 2. Clone Repository (Branch 0.5.1)
-
-```bash
-git clone -b 0.5.1 https://github.com/your-repo/Neural-Forecast.git
+git clone -b v0.5.1.2 https://github.com/MattMagg/Neural-Forecast.git
 cd Neural-Forecast
 ```
 
-## 3. Run Setup Script
+## 2. Run Setup Script
 
 ```bash
 chmod +x setup.sh
@@ -25,53 +28,54 @@ chmod +x setup.sh
 ```
 
 This installs:
-- System packages (build tools, CUDA, NVIDIA drivers)
-- TA-Lib C library
-- All Python dependencies in correct order
 
-## 4. Reboot (Required for NVIDIA drivers)
+- System packages (build tools, development libraries)
+- Python 3.13.6 and pip
+- Node.js and Claude Code for AI-assisted development
+- TA-Lib C library for technical analysis
+- All Python dependencies in correct order (upgrades PyTorch to 2.8.0)
+- Creates virtual environment and project structure
 
-```bash
-sudo reboot
-```
-
-## 5. Verify GPU Access
+## 3. Verify Setup
 
 ```bash
+# Check GPU access
 nvidia-smi
-python3.13 -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
+source .venv/bin/activate
+python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
 ```
 
-## 6. Start Training
+## 4. Start Training
 
-Navigate to notebooks and run training:
-
-```bash
-cd notebooks
-python3.13 -m jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root
-```
-
-Or run training scripts directly:
+Activate environment and start training:
 
 ```bash
-# Train h4 model (1 hour horizon)
-python3.13 run_train.py --horizon h4
+source .venv/bin/activate
+
+# Train single horizon (1-hour forecast)
+python run_train.py --horizon h4
 
 # Train all horizons
-python3.13 run_train.py --horizon h4
-python3.13 run_train.py --horizon h8  
-python3.13 run_train.py --horizon h16
-python3.13 run_train.py --horizon h32
+python run_train.py --horizon h4
+python run_train.py --horizon h8  
+python run_train.py --horizon h16
+python run_train.py --horizon h32
 ```
 
-## 7. Monitor Training
+Or use JupyterLab (pre-installed):
+
+```bash
+jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root
+```
+
+## 5. Monitor Training
 
 ```bash
 # Watch GPU usage
 watch -n 1 nvidia-smi
 
-# Check logs
-tail -f logs/training.log
+# Check training logs
+tail -f experiments/h4/training.log
 ```
 
-That's it! The system is ready for BTC forecasting model training.
+That's it! The system is ready for BTC forecasting model training with pre-installed CUDA 12.9, PyTorch, and JupyterLab.

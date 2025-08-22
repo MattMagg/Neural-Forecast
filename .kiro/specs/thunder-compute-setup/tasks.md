@@ -1,7 +1,7 @@
 # Implementation Plan
 
-- [-] 1. Create Thunder Compute setup script
-  - [ ] 1.1 Create setup.sh script for complete environment setup
+- [x] 1. Create Thunder Compute setup script
+  - [x] 1.1 Create setup.sh script for complete environment setup
     - Install system packages (build-essential, git, curl, wget)
     - Install Python 3.13.6 from deadsnakes PPA
     - Install NVIDIA drivers and CUDA toolkit for A100XL
@@ -13,7 +13,7 @@
     - Run basic validation tests using existing test suite
     - _Reference: dependencies.yaml installation_notes section_
 
-  - [ ] 1.2 Create validation script using existing tests
+  - [x] 1.2 Create validation script using existing tests
     - Use existing validation functions from utils/validate.py
     - Test GPU access with torch.cuda.is_available()
     - Test critical imports (neuralforecast, talib, vectorbt)
@@ -22,8 +22,8 @@
     - Generate setup report with package versions
     - _Reference: existing tests in tests/ directory_
 
-- [ ] 2. Create practical training guide
-  - [ ] 2.1 Create TRAINING_GUIDE.md with A100XL-specific commands
+- [x] 2. Create practical training guide
+  - [x] 2.1 Create TRAINING_GUIDE.md with A100XL-specific commands
     - Provide specific training commands for each horizon (h4, h8, h16, h32)
     - Include optimal batch sizes for 80GB VRAM (512 default, 256 fallback)
     - Add GPU monitoring commands (nvidia-smi, gpustat)
@@ -32,15 +32,15 @@
     - Provide performance optimization tips for A100XL
     - _Reference: settings.yaml for current batch sizes and configurations_
 
-- [ ] 3. Create cleanup and utility scripts
-  - [ ] 3.1 Create cleanup.sh for failed installations
+- [x] 3. Create cleanup and utility scripts
+  - [x] 3.1 Create cleanup.sh for failed installations
     - Remove partial virtual environment
     - Clean up downloaded packages
     - Reset CUDA/driver installations if needed
     - Provide fresh start capability
     - _Reference: common cleanup patterns_
 
-  - [ ] 3.2 Create quick validation script
+  - [x] 3.2 Create quick validation script
     - Test that all implemented modules work
     - Verify GPU is accessible and has 80GB VRAM
     - Run smoke test using existing pipeline
