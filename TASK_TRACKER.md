@@ -25,7 +25,7 @@ When updating this document:
 
 ---
 
-## Project Version: 0.5.1.3
+## Project Version: 0.5.2.0
 
 **Last Updated**: 2025-08-22
 
@@ -40,6 +40,7 @@ When updating this document:
 | notebook-conversion | COMPLETED | 4/4 | Converted scripts to Jupyter notebooks |
 | infrastructure-setup | COMPLETED | 6/6 | Thunder Compute & Modal GPU setup, documentation reorganization |
 | thunder-compute-setup | COMPLETED | 3/3 | Pre-installed software compatibility, setup automation |
+| training-guide-vscode-optimization | IN PROGRESS | 1/12 | Foundation workflow documentation (Task 1 complete) |
 
 ---
 
@@ -546,6 +547,18 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 
 ## Changelog
 
+### [0.5.2.0] - 2025-08-22
+- **Training Guide Foundation Workflow Update**
+- Completed Task 1 of training-guide-vscode-optimization spec
+- Updated docs/workflows/TRAINING_GUIDE.md with foundation workflow (Specs 1-4)
+- Replaced existing guide with notebook-focused sequential workflow
+- Documented 3-step process: setup.sh → kaggle_download_btc.py → run_train.ipynb
+- Added cell-by-cell execution guidance with expected outputs
+- Included A100XL-specific optimizations and comprehensive troubleshooting
+- Added local pre-GPU validation framework to minimize GPU debugging time
+- Focus on foundation capability with basic forecasting/prediction
+- Created training guide optimization specification (1/12 tasks complete)
+
 ### [0.5.1.3] - 2025-08-22
 
 - **Thunder Compute Pre-installed Software Compatibility Update**
@@ -624,3 +637,60 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 ### [0.0.0] - Initial
 
 - Project initialization and planning phase
+
+---
+
+## Training Guide VSCode Optimization Spec
+**Status**: IN PROGRESS  
+**Version**: 0.5.2.0  
+**Spec Location**: `.kiro/specs/training-guide-vscode-optimization/`
+
+### Task Completion
+
+- [x] **Task 1**: Update TRAINING_GUIDE.md with Foundation Workflow (Specs 1-4 Only) **[DOC]**
+  - `docs/workflows/TRAINING_GUIDE.md`: Complete rewrite focusing on foundation workflow
+    - Replaced existing guide with notebook-focused sequential workflow
+    - Documented 3-step process: setup.sh → kaggle_download_btc.py → run_train.ipynb
+    - Added cell-by-cell execution guidance for run_train.ipynb with expected outputs
+    - Documented horizon selection (h4/h8/h16/h32) using existing YAML configurations
+    - Included A100XL-specific optimizations and batch sizes (512 for most models, 256 for PatchTST)
+    - Added GPU monitoring commands (nvidia-smi, gpustat) and progress indicators
+    - Documented artifact locations: experiments/h{horizon}/ structure with cv_results, metrics, leaderboard
+    - Explained sCRPS scores interpretation (lower is better, <0.12 good), coverage metrics (±2% tolerance)
+    - Comprehensive troubleshooting for common error scenarios (CUDA OOM, import errors, data validation failures)
+    - Added local pre-GPU validation framework to minimize GPU debugging time
+    - Focus on foundation capability with Specs 1-4 implementation, noted additional specs (5-14) for later
+    - All paths relative to workspace root for consistency
+
+- [ ] **Task 2**: Create local validation framework **[VALIDATION]**
+- [ ] **Task 3**: Implement setup verification system **[SCRIPT]**
+- [ ] **Task 4**: Create data acquisition validation **[VALIDATION]**
+- [ ] **Task 5**: Develop notebook execution guide **[DOC]**
+- [ ] **Task 6**: Create horizon configuration guide **[DOC]**
+- [ ] **Task 7**: Implement GPU monitoring dashboard **[SCRIPT]**
+- [ ] **Task 8**: Create artifact interpretation guide **[DOC]**
+- [ ] **Task 9**: Develop comprehensive testing suite **[VALIDATION]**
+- [ ] **Task 10**: Create troubleshooting automation **[SCRIPT]**
+- [ ] **Task 11**: Implement integration testing **[VALIDATION]**
+- [ ] **Task 12**: Create final validation and documentation **[DOC]**
+
+### Files Created/Modified
+- `docs/workflows/TRAINING_GUIDE.md` - Complete foundation workflow guide (replaced existing)
+- `.kiro/specs/training-guide-vscode-optimization/requirements.md` - Requirements specification
+- `.kiro/specs/training-guide-vscode-optimization/design.md` - Architecture and design decisions
+- `.kiro/specs/training-guide-vscode-optimization/tasks.md` - Implementation task breakdown
+
+### Key Features Implemented
+- **Sequential 3-step workflow** for autonomous training execution
+- **Cell-by-cell notebook guidance** with expected outputs for each execution step
+- **A100XL optimization** with tested batch sizes and memory settings
+- **Comprehensive error recovery** procedures for common failure modes
+- **Local validation framework** to catch preventable issues before GPU deployment
+- **Clear artifact interpretation** for sCRPS scores, coverage metrics, and leaderboard format
+- **Foundation focus** clearly noting Specs 1-4 coverage with basic forecasting capability
+
+### Next Steps
+- Implement remaining 11 tasks for complete training guide optimization
+- Focus on local validation to minimize GPU resource waste
+- Create comprehensive testing and troubleshooting automation
+- Develop integration testing for end-to-end workflow validation
