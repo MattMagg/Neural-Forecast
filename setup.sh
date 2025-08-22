@@ -107,7 +107,7 @@ if [ "$DRY_RUN" = true ]; then
     dry_run "npm install -g @anthropic-ai/claude-code"
     dry_run "python3 -m pip install --upgrade pip"
     dry_run "sudo apt install -y libta-lib-dev (or compile from source)"
-    dry_run "git clone -b v0.5.1.2 https://github.com/MattMagg/Neural-Forecast.git"
+    dry_run "git clone -b instance-training-v0.5.2.X https://github.com/MattMagg/Neural-Forecast.git"
     dry_run "python3 -m venv .venv"
     dry_run "source .venv/bin/activate"
     dry_run "pip install numpy (compatible with pre-installed PyTorch)"
