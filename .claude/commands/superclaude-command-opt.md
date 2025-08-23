@@ -1,40 +1,58 @@
-Read the following document and analyze it thoroughly and completley -> .claude/s-claude-docs/superclaude-agent-usage-guide.md
+**🚨 MANDATORY PREREQUISITE - READ FIRST 🚨**
 
-**CRITICAL TASK AND DIRECTIVE**:
+You MUST read the ENTIRE document located at: `docs/tools/superclaude-agent-usage-guide.md`
 
-YOU ARE NOT EXECUTING OR COMPLETING ANY PART OF THE ARGUMENTS OR USER PROMPT!!!. You are only **DETERMINING WHAT SUPERCLAUDE COMMANDS, FLAGS, AND PARAMETERS** to use for this prompt according to the SuperClaude Framework.
+This is NOT optional. Read EVERY SINGLE LINE from start to finish. This document contains:
+- ALL 21 available SuperClaude commands and their usage patterns
+- ALL 17 repo-specific agents (@agent-*) and their activation triggers
+- ALL flags, parameters, and optimization strategies
+- Neural-Forecast specific command combinations and workflows
+- Critical agent coordination patterns for this ML repository
 
-Your Purpose and task: Convert any user task or draft prompt into the optimal SuperClaude command + flags for this Neural-Forecast repository while activating the most efficient and optimal specialists for the objective of the prompt in provided below.
-
-$ARGUMENTS
+⚠️ FAILURE TO READ THE COMPLETE GUIDE WILL RESULT IN SUBOPTIMAL COMMAND GENERATION ⚠️
 
 ---
 
-## Context & Scenario
+**CRITICAL TASK AND DIRECTIVE**:
 
-You (the LLM) have unlimited time and computational resources to craft your response. The goal is to generate the most optimal response possible given the user's request, rather than a quick, minimal response. There are very few absolute certainties in life, but this approach of deliberate, iterative refinement aims to ensure a higher-quality result.
+🛑 YOU ARE NOT EXECUTING OR COMPLETING ANY PART OF THE ARGUMENTS OR USER PROMPT! 🛑
 
-## System & Context Review
+Your SOLE PURPOSE is command optimization:
 
-1. Revisit your system instructions (or any higher-priority guidelines) before formulating your response.
-2. Incorporate relevant background or contextual information from your knowledge base to ensure completeness and accuracy.
+1. **ANALYZE** the user's prompt/task provided in $ARGUMENTS below
+2. **MAP** the task to the optimal SuperClaude commands from the guide
+3. **SELECT** appropriate flags (--think, --seq, --validate, etc.)
+4. **IDENTIFY** which of the 17 repo-specific agents to invoke
+5. **CONSTRUCT** multiple optimized command options
+6. **OUTPUT** the results in this EXACT format:
 
-## Iterative Drafting Process
+## Output Format (REQUIRED):
+*Note that below is a general template and the actual commmand combo will vary from any given task from the user. For example, you don't have to include @agent-name if it doesn't fit, or those exact number of flags, you can include more agents if optimal or more flags, etc.
 
-1. Draft First, Then Refine
-   1.1. Consider your initial generation a draft, not a final output.
-   1.2. Iterate on that draft internally, enhancing and optimizing it in multiple cycles.
+```
+Here are the optimal SuperClaude command options:
 
-2. Continuous Improvement
-   2.1. After each internal pass, reassess clarity, correctness, and thoroughness.
-   2.2. Integrate any missing details, strengthen the reasoning, and ensure your explanation is complete.
+**Option 1 (Recommended):**
+/sc:[command] "[minimally modified prompt]" --flag1 --flag2 @agent-name
 
-3. High Confidence Threshold
-   3.1. Only stop refining once you are certain that the plan is the best you can produce.
-   3.2. Achieve 100% confidence in the correctness and utility of the final answer before presenting it to the user.
+**Option 2 (Alternative approach):**
+/sc:[command] "[minimally modified prompt]" --flag3 --flag4 @agent-name2
 
-## Final Output Assurance
+**Option 3 (Comprehensive):**
+/sc:[command] "[minimally modified prompt]" --flag5 --flag6 @agent-name3 @agent-name4
+```
 
-1. Once you decide your response has reached its optimal form, present it confidently as your final output.
-2. Throughout the process, if any uncertainties arise, continue refining before concluding.
-3. By following these instructions, you will iteratively craft a comprehensive, accurate, and context-aware response, ensuring your final output is the best possible.
+IMPORTANT RULES:
+- Provide 2-3 optimal command variations
+- Keep the original prompt mostly intact (minimal modification for clarity only)
+- Include relevant repo-specific agents from the 17 available
+- Add appropriate flags based on task complexity
+- Order options from most recommended to alternatives
+
+Your task: Convert the user prompt below into MULTIPLE OPTIMAL SuperClaude commands for this Neural-Forecast repository.
+
+---
+
+USER PROMPT TO OPTIMIZE:
+
+$ARGUMENTS

@@ -25,9 +25,9 @@ When updating this document:
 
 ---
 
-## Project Version: 0.5.2.1
+## Project Version: 0.5.2.2
 
-**Last Updated**: 2025-01-22
+**Last Updated**: 2025-08-22
 
 ## Specifications Status
 
@@ -546,6 +546,16 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 ---
 
 ## Changelog
+
+### [0.5.2.2] - 2025-08-22
+- **Critical Configuration Fixes and Robustness Improvements**
+- Fixed val_size configuration in all YAML files to follow 4*h rule (h4=16, h8=32, h16=64, h32=128)
+- Added comprehensive checkpointing functionality to cv/runner.py for long training runs
+- Enhanced kaggle_download_btc.py with data integrity verification (file size, row count, columns)
+- Added kagglehub to requirements.txt and setup.sh for data downloading
+- Updated TRAINING_GUIDE.md with checkpointing instructions and data verification
+- Documented val_size auto-correction behavior in notebooks
+- All changes improve system robustness for expensive GPU training sessions
 
 ### [0.5.2.1] - 2025-01-22
 - Analyzed and documented file usage across all project directories

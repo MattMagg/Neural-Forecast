@@ -221,9 +221,9 @@ log "Installing Python dependencies in critical order..."
 log "Installing numpy==2.3.2..."
 pip install numpy==2.3.2
 
-# Step 2: pandas and pyarrow
-log "Installing pandas==2.3.1 and pyarrow==20.0.0..."
-pip install pandas==2.3.1 pyarrow==20.0.0
+# Step 2: pandas, pyarrow, and kagglehub for data downloading
+log "Installing pandas==2.3.1, pyarrow==20.0.0, and kagglehub..."
+pip install pandas==2.3.1 pyarrow==20.0.0 kagglehub
 
 # Step 3: PyTorch (upgrade from pre-installed 2.7.1 to 2.8.0 for compatibility)
 log "Upgrading PyTorch from pre-installed 2.7.1 to 2.8.0 for CUDA 12.9 compatibility..."

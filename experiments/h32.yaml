@@ -14,7 +14,7 @@ scaler_type:
 # Cross-validation settings
 n_windows: 6
 step_size: 32
-val_size: 64
+val_size: 128  # 4*h where h=32
 refit: true
 
 # Exogenous variable lists (populated at runtime by feature engineering)

@@ -103,25 +103,29 @@ Each horizon (h4, h8, h16, h32) has:
 
 ## Specialized Sub-Agents
 
-This project includes 13 specialized Claude Code sub-agents that handle specific aspects of the Neural-Forecast implementation. Each agent has deep expertise in their domain and follows the lean, NF-centric philosophy of this project.
+This project includes 17 specialized Claude Code sub-agents that handle specific aspects of the Neural-Forecast implementation. Each agent has deep expertise in their domain and follows the lean, NF-centric philosophy of this project.
 
 ### Available Sub-Agents & Their Roles
 
 | Agent | Purpose | When to Use |
 |-------|---------|-------------|
+| **config-architect** | Project configuration | Setting up structure, managing settings.yaml, dependencies |
+| **cv-runner** | Cross-validation execution | Running NF's native CV, computing sCRPS metrics |
 | **data-validation-specialist** | Data contracts & validation | Validating timestamps, creating canonical frames, checking for leakage |
 | **feature-engineering-specialist** | Technical indicators & MTF features | Building features, applying shift(1), ensuring ≤256 features |
-| **nf-model-factory** | Model instantiation | Creating NF models with proper losses and configurations |
-| **cv-runner** | Cross-validation execution | Running NF's native CV, computing sCRPS metrics |
-| **uq-calibration-specialist** | Uncertainty quantification | Checking prediction intervals, PIT analysis, coverage validation |
-| **model-selector-ensemble** | Model selection & ensembling | Ranking models by sCRPS, creating equal-weight ensembles |
 | **hpo-optimizer** | Hyperparameter optimization | Tuning model parameters, using NF's Auto* models |
 | **inference-pipeline** | Production inference | Loading models, generating predictions, <100ms latency |
-| **production-monitor** | Performance monitoring | Tracking drift, triggering retraining, version management |
-| **risk-mitigation-specialist** | Risk handling | Preventing MTF misalignment, quantile crossing, GPU OOM |
-| **quality-gate-validator** | Acceptance testing | Verifying models meet acceptance criteria before deployment |
-| **config-architect** | Project configuration | Setting up structure, managing settings.yaml, dependencies |
 | **integration-test-orchestrator** | E2E testing | Running integration tests, performance benchmarks |
+| **modal-gpu-orchestrator** | Modal GPU deployment | Converting to Modal functions, A100 orchestration, volume persistence |
+| **model-selector-ensemble** | Model selection & ensembling | Ranking models by sCRPS, creating equal-weight ensembles |
+| **nf-model-factory** | Model instantiation | Creating NF models with proper losses and configurations |
+| **nf-validation-expert** | NeuralForecast validation | Validating implementations against official NF documentation |
+| **production-monitor** | Performance monitoring | Tracking drift, triggering retraining, version management |
+| **quality-gate-validator** | Acceptance testing | Verifying models meet acceptance criteria before deployment |
+| **risk-mitigation-specialist** | Risk handling | Preventing MTF misalignment, quantile crossing, GPU OOM |
+| **spec-architect** | Specification design | Creating design.md, requirements.md, tasks.md documentation |
+| **spec-validation-auditor** | Spec quality assurance | Validating technical specifications meet project standards |
+| **uq-calibration-specialist** | Uncertainty quantification | Checking prediction intervals, PIT analysis, coverage validation |
 
 ### Invoking Sub-Agents with SuperClaude Framework
 
@@ -239,6 +243,25 @@ Critical sequential paths that must be respected:
 2. **Model Pipeline**: `nf-model-factory` → `cv-runner` → `model-selector-ensemble` → `inference-pipeline`
 3. **Quality Pipeline**: `uq-calibration-specialist` → `quality-gate-validator` → `production-monitor`
 4. **Risk Integration**: `risk-mitigation-specialist` provides checks to all other agents
+
+### Key Agent Combinations
+
+**Model Development Pipeline:**
+- `nf-validation-expert` → validates NF usage patterns
+- `nf-model-factory` → creates model instances
+- `cv-runner` → executes cross-validation
+- `uq-calibration-specialist` → validates uncertainty quantification
+
+**Production Deployment:**
+- `modal-gpu-orchestrator` → handles GPU infrastructure
+- `inference-pipeline` → implements prediction system
+- `production-monitor` → tracks performance
+- `quality-gate-validator` → enforces deployment criteria
+
+**Feature Engineering:**
+- `data-validation-specialist` → ensures data quality
+- `feature-engineering-specialist` → builds indicators
+- `risk-mitigation-specialist` → prevents leakage
 
 ### Sub-Agent Philosophy
 

@@ -95,6 +95,10 @@ cv.runner: OK
 
 Downloads the Bitcoin historical data from Kaggle using the kagglehub API.
 
+### Prerequisites
+- **kagglehub package**: Automatically installed by setup.sh or via `pip install kagglehub`
+- **Kaggle API credentials**: Configure if needed (kagglehub handles authentication)
+
 ### Command
 ```bash
 cd data/raw
@@ -104,7 +108,11 @@ python kaggle_download_btc.py
 ### What It Does
 1. **Downloads Dataset**: Fetches 'mczielinski/bitcoin-historical-data' from Kaggle
 2. **File Copy**: Copies `btcusd_1-min_data.csv` to `data/raw/`
-3. **Validation**: Ensures file is accessible for processing
+3. **Data Integrity Verification**: 
+   - Checks file size (>400MB expected)
+   - Validates row count (>7M rows expected)
+   - Verifies required columns exist
+   - Confirms date range coverage
 
 ### Expected Output
 ```
@@ -281,9 +289,9 @@ freq: "15min"          # Base frequency
 seed: 1337             # Reproducibility
 
 # Cross-validation settings  
-n_windows: 6           # CV windows
-step_size: 4           # Non-overlapping (= h)
-val_size: 64           # Validation size
+n_windows: 6           # CV windows (6 for pilot, 10 for final)
+step_size: 4           # Non-overlapping (= h, changes per horizon)
+val_size: 16           # Should be 4*h (auto-corrected at runtime)
 refit: true            # Refit each window
 
 # Model portfolio (4 models with StudentT loss)
@@ -294,6 +302,17 @@ models:
   - PATCHTST: {...}    # Patch Time Series Transformer
 ```
 
+### Important Configuration Notes
+
+**Val_size Auto-Correction:**
+The system automatically corrects `val_size` to be `4*h` as per the specification:
+- h=4: val_size should be 16 (1 hour forecast, 4 hours validation)
+- h=8: val_size should be 32 (2 hour forecast, 8 hours validation)  
+- h=16: val_size should be 64 (4 hour forecast, 16 hours validation)
+- h=32: val_size should be 128 (8 hour forecast, 32 hours validation)
+
+The YAML files have been updated with correct values. If misconfigured, `run_train.ipynb` will auto-correct at runtime (lines 271-276).
+
 ### Safe Parameters to Modify
 
 **Adjustable without breaking system:**
@@ -302,10 +321,11 @@ models:
 - `max_steps`: Increase for longer training (20000 → 30000)
 - `early_stop_patience_steps`: Adjust early stopping (400 → 600)
 
-**Do NOT modify:**
-- `h`, `step_size`, `val_size` (breaks CV semantics)
+**Do NOT modify without understanding:**
+- `h`, `step_size` (must maintain step_size=h for non-overlapping windows)
+- `val_size` (should be 4*h per specification)
 - `freq` (breaks data alignment)
-- Model architecture parameters without understanding
+- Model architecture parameters
 
 ## GPU Monitoring and Progress Indicators
 
@@ -427,6 +447,66 @@ df = pd.read_parquet('experiments/h4/cv_results_20250822T120000Z.parquet')
 print(f'CV results shape: {df.shape}')
 print(f'Models: {df.columns[df.columns.str.contains(\"_t\")].tolist()}')
 "
+```
+
+## Checkpointing and Recovery
+
+### Training Checkpoints (NEW)
+
+To prevent loss of progress during long training runs, the system now supports checkpointing:
+
+#### Manual Checkpointing
+Add this to your notebook after each CV window:
+```python
+import torch
+import pickle
+from pathlib import Path
+
+def save_checkpoint(cv_df, window_idx, horizon, checkpoint_dir="checkpoints"):
+    """Save intermediate CV results and model states."""
+    checkpoint_dir = Path(checkpoint_dir)
+    checkpoint_dir.mkdir(exist_ok=True)
+    
+    checkpoint = {
+        'cv_results': cv_df,
+        'window_idx': window_idx,
+        'horizon': horizon,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    checkpoint_path = checkpoint_dir / f"checkpoint_h{horizon}_w{window_idx}.pkl"
+    with open(checkpoint_path, 'wb') as f:
+        pickle.dump(checkpoint, f)
+    
+    logger.info(f"Checkpoint saved: {checkpoint_path}")
+    return checkpoint_path
+
+def load_checkpoint(horizon, checkpoint_dir="checkpoints"):
+    """Load the most recent checkpoint for a horizon."""
+    checkpoint_dir = Path(checkpoint_dir)
+    checkpoints = list(checkpoint_dir.glob(f"checkpoint_h{horizon}_*.pkl"))
+    
+    if not checkpoints:
+        return None
+    
+    latest = max(checkpoints, key=lambda p: p.stat().st_mtime)
+    with open(latest, 'rb') as f:
+        checkpoint = pickle.load(f)
+    
+    logger.info(f"Loaded checkpoint: {latest}")
+    return checkpoint
+```
+
+#### Resume from Checkpoint
+```python
+# Check for existing checkpoint before starting training
+checkpoint = load_checkpoint(cfg['h'])
+if checkpoint:
+    logger.info(f"Resuming from window {checkpoint['window_idx']}")
+    # Resume CV from saved window
+    start_window = checkpoint['window_idx'] + 1
+else:
+    start_window = 0
 ```
 
 ## Troubleshooting and Error Recovery
@@ -576,6 +656,54 @@ torch.cuda.empty_cache()
 # Monitor memory usage
 print(f'GPU Memory: {torch.cuda.memory_allocated()/1e9:.1f}GB allocated')
 print(f'GPU Memory: {torch.cuda.memory_reserved()/1e9:.1f}GB reserved')
+```
+
+## Data Integrity Verification
+
+### Verify Downloaded Data
+After running `kaggle_download_btc.py`, verify data integrity:
+
+```python
+import hashlib
+import pandas as pd
+
+def verify_btc_data(file_path="data/raw/btcusd_1-min_data.csv"):
+    """Verify BTC data file integrity and basic statistics."""
+    # Expected characteristics (adjust based on latest data)
+    EXPECTED_MIN_ROWS = 7_000_000  # ~7M 1-minute bars
+    EXPECTED_MIN_SIZE_MB = 400     # ~400-500MB file
+    EXPECTED_COLUMNS = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+    
+    # Check file size
+    import os
+    file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    assert file_size_mb >= EXPECTED_MIN_SIZE_MB, f"File too small: {file_size_mb:.1f}MB"
+    
+    # Load and verify structure
+    df = pd.read_csv(file_path, nrows=100000)  # Sample for quick check
+    
+    # Verify columns
+    missing_cols = set(EXPECTED_COLUMNS) - set(df.columns)
+    assert not missing_cols, f"Missing columns: {missing_cols}"
+    
+    # Count total rows
+    total_rows = sum(1 for _ in open(file_path)) - 1  # Subtract header
+    assert total_rows >= EXPECTED_MIN_ROWS, f"Too few rows: {total_rows:,}"
+    
+    # Verify date range
+    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
+    date_range = f"{df['timestamp'].min()} to {df['timestamp'].max()}"
+    
+    print(f"✅ Data verification passed:")
+    print(f"   File size: {file_size_mb:.1f}MB")
+    print(f"   Total rows: {total_rows:,}")
+    print(f"   Date range: {date_range}")
+    print(f"   Columns: {list(df.columns)}")
+    
+    return True
+
+# Run verification after download
+verify_btc_data()
 ```
 
 ## Local Pre-GPU Validation
