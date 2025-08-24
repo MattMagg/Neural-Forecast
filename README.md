@@ -64,13 +64,8 @@ This system delivers high-quality probabilistic forecasts for BTC at 15-minute f
 
 ## Acknowledgments
 
-This project is built with [NeuralForecast](https://github.com/Nixtla/neuralforecast) by Nixtla for state-of-the-art neural forecasting capabilities.
+This project uses the NeuralForecast library. If you use this project in your research, please cite the NeuralForecast library:
 
-### Citations
-
-This project uses the NeuralForecast library. If you use this project in your research, please cite both this repository and the NeuralForecast library:
-
-**NeuralForecast Library:**
 ```bibtex
 @misc{olivares2022library_neuralforecast,
     author={Kin G. Olivares and
