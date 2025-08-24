@@ -25,9 +25,9 @@ When updating this document:
 
 ---
 
-## Project Version: 0.5.2.2
+## Project Version: 0.5.2.4
 
-**Last Updated**: 2025-08-22
+**Last Updated**: 2025-08-24
 
 ## Specifications Status
 
@@ -547,6 +547,22 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 
 ## Changelog
 
+### [0.5.2.4] - 2025-08-24
+- **Data Pipeline Issues Fully Resolved**
+- Fixed missing load_and_process_data() function in utils/io.py
+- Added column name normalization to handle CSV capitalization (Timestamp → timestamp)
+- Integrated complete data processing pipeline: load → normalize → aggregate → canonicalize
+- Fixed ImportError in run_train.ipynb that prevented training execution
+- Tested full data loading pipeline with 477K 15-minute bars from 7.16M raw records
+- All data pipeline blocking issues resolved, ready for GPU training
+
+### [0.5.2.3] - 2025-08-24
+- **Partial Fix for vectorbt API Compatibility**
+- Fixed AttributeError in features/builder.py where RSI object lacked '_results' attribute
+- Modified _compute_talib() to use output_names and getattr() for indicator access
+- Identified but not fixed: missing load_and_process_data() function
+- Identified but not fixed: column name capitalization issues
+
 ### [0.5.2.2] - 2025-08-22
 - **Critical Configuration Fixes and Robustness Improvements**
 - Fixed val_size configuration in all YAML files to follow 4*h rule (h4=16, h8=32, h16=64, h32=128)
@@ -704,26 +720,35 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 
 ### Issue #1: vectorbt API Compatibility & Data Pipeline Issues
 **Date**: 2025-08-24  
-**Status**: PARTIALLY RESOLVED  
-**Version**: 0.5.2.3  
+**Status**: RESOLVED  
+**Version**: 0.5.2.4  
 **Tags**: [DEPENDENCY] [SCRIPT] [VALIDATION]
 
-#### What Was Fixed
-- **Error**: AttributeError - RSI object has no attribute _results
+#### Complete Resolution Summary
+
+##### 1. vectorbt API Compatibility (Fixed in v0.5.2.3)
+- **Error**: AttributeError - RSI object has no attribute '_results'
 - **Location**: features/builder.py line 22 in _compute_talib()
 - **Solution**: Modified function to use output_names and getattr() instead of _results
-- **Testing**: RSI and BBANDS computation work in isolation
+- **Commit**: f7bafeb on instance-training-v0.5.2.X branch
 
-#### What Remains Broken
-1. **Missing Function**: load_and_process_data() does not exist in utils/io.py
-   - Notebook expects this function but it is not implemented
-   - Available functions: load_raw_1min_data(), aggregate_1min_to_15min()
+##### 2. Missing Data Loading Function (Fixed in v0.5.2.4)
+- **Error**: ImportError - cannot import name 'load_and_process_data' from 'utils.io'
+- **Location**: run_train.ipynb Cell [10] expected this function
+- **Solution**: Implemented load_and_process_data() in utils/io.py
+- **Commit**: 5774d92 on instance-training-v0.5.2.X branch
 
-2. **Column Name Mismatch**: 
-   - CSV has: [Timestamp, Open, High, Low, Close, Volume]
-   - Code expects: [timestamp, open, high, low, close, volume]
+##### 3. Column Name Capitalization (Fixed in v0.5.2.4)
+- **Issue**: CSV has [Timestamp, Open, High, Low, Close, Volume] but code expects lowercase
+- **Solution**: Added column normalization in load_and_process_data()
+- **Implementation**: df.columns = df.columns.str.lower() handles all cases
 
-3. **Full Pipeline Integration**: Not tested due to above issues
+#### Full Pipeline Status
+- ✅ Data loading: 477,464 rows processed from 7.16M raw records
+- ✅ Column normalization: Capitalized → lowercase → NF schema
+- ✅ 15-minute aggregation: Proper OHLCV aggregation rules applied
+- ✅ NF canonical format: unique_id, ds, y (log returns), OHLCV columns
+- ✅ Ready for GPU training: All blocking issues resolved
 
 #### Environment Setup Completed (via setup.sh)
 All dependencies from setup.sh were successfully installed:
