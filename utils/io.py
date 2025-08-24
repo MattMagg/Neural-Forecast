@@ -450,6 +450,40 @@ def make_nf_canonical(df_ohlcv_15m: pd.DataFrame, unique_id: str = "BTC-USD") ->
     return df_canonical[canonical_cols]
 
 
+def load_and_process_data(filepath: str = "data/raw/btcusd_1-min_data.csv") -> pd.DataFrame:
+    """
+    Load raw data and process to NF-ready format with 15-minute aggregation.
+    
+    This is the main entry point for data loading, handling:
+    - Column name normalization (Capitalized → lowercase)
+    - 15-minute aggregation
+    - NF canonical format conversion
+    
+    Args:
+        filepath: Path to raw 1-minute OHLCV CSV file
+        
+    Returns:
+        DataFrame in NF canonical format (15-minute bars with log returns)
+        
+    Raises:
+        FileNotFoundError: If the data file doesn't exist
+        ValueError: If data processing fails
+    """
+    # 1. Load raw 1-minute data
+    df = load_raw_1min_data(filepath)
+    
+    # 2. Normalize column names to lowercase (handles Capitalized columns)
+    df.columns = df.columns.str.lower()
+    
+    # 3. Aggregate to 15-minute bars
+    df_15min = aggregate_1min_to_15min(df)
+    
+    # 4. Create NF canonical frame with log returns
+    nf_df = make_nf_canonical(df_15min)
+    
+    return nf_df
+
+
 def drop_train_nans_and_winsorize(nf_df: pd.DataFrame, lower_q: float = 0.001, upper_q: float = 0.999) -> pd.DataFrame:
     """
     Apply winsorization for training stability while preserving evaluation data.
