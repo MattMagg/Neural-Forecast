@@ -9,4 +9,13 @@ wheels/
 # Virtual environments
 .venv
 data/raw/btcusd_1-min_data.csv
-docs
+
+# IDE and development files
+CLAUDE.md
+**/CLAUDE.md
+.mcp.json
+AGENTS.md
+docs/
+.claude/
+.kiro/
+.vscode/
