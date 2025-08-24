@@ -697,3 +697,53 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 - ✅ All procedures documented against existing system (v0.5.1.2)
 - ✅ Comprehensive troubleshooting for common failure modes
 - ✅ Clear, actionable documentation enabling autonomous training execution
+
+---
+
+## Debugging & Issues
+
+### Issue #1: vectorbt API Compatibility & Data Pipeline Issues
+**Date**: 2025-08-24  
+**Status**: PARTIALLY RESOLVED  
+**Version**: 0.5.2.3  
+**Tags**: [DEPENDENCY] [SCRIPT] [VALIDATION]
+
+#### What Was Fixed
+- **Error**: AttributeError - RSI object has no attribute _results
+- **Location**: features/builder.py line 22 in _compute_talib()
+- **Solution**: Modified function to use output_names and getattr() instead of _results
+- **Testing**: RSI and BBANDS computation work in isolation
+
+#### What Remains Broken
+1. **Missing Function**: load_and_process_data() does not exist in utils/io.py
+   - Notebook expects this function but it is not implemented
+   - Available functions: load_raw_1min_data(), aggregate_1min_to_15min()
+
+2. **Column Name Mismatch**: 
+   - CSV has: [Timestamp, Open, High, Low, Close, Volume]
+   - Code expects: [timestamp, open, high, low, close, volume]
+
+3. **Full Pipeline Integration**: Not tested due to above issues
+
+#### Environment Setup Completed (via setup.sh)
+All dependencies from setup.sh were successfully installed:
+- **Core**: numpy==2.3.2, pandas==2.3.1, pyarrow==20.0.0, kagglehub
+- **ML Framework**: torch==2.8.0, pytorch-lightning==2.5.3, neuralforecast==3.0.2
+- **Statistical**: scikit-learn==1.7.1, statsmodels==0.14.5
+- **Technical Indicators**: 
+  - TA-Lib==0.6.5 (Python wrapper, C library pre-installed)
+  - vectorbt==0.28.0
+  - pandas-ta-openbb==0.4.22
+  - technical==1.4.0
+- **Trading**: freqtrade==2025.7
+
+#### Files Modified
+- features/builder.py: Fixed _compute_talib() function for vectorbt 0.28.1 compatibility
+
+#### Next Steps Required
+1. Implement load_and_process_data() in utils/io.py OR update notebook to use existing functions
+2. Handle column name capitalization issue
+3. Complete full pipeline integration testing
+4. Verify notebook execution end-to-end
+
+**Issue remains OPEN for complete resolution**

@@ -19,20 +19,51 @@ def _compute_talib(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataFrame:
     params = {k: np.array(v) for k, v in spec.params.items()} if spec.params else {}
     inputs = [df[i] for i in spec.inputs]
     out = fac.run(*inputs, **params)
-    data = out._results  # dict of outputs (e.g., upper, middle, lower) mapped to DataFrames
+    
+    # Get output names from the indicator - vectorbt indicators have direct attributes
+    # not _results. Each indicator type has specific output attributes:
+    # RSI -> .real, BBANDS -> .upperband/.middleband/.lowerband, etc.
+    if hasattr(out, 'output_names'):
+        output_names = out.output_names
+    else:
+        # Default to 'real' for single-output indicators like RSI
+        output_names = ['real']
+    
+    # Collect data from each output attribute
+    data = {}
+    for name in output_names:
+        if hasattr(out, name):
+            attr_value = getattr(out, name)
+            # Ensure it's a DataFrame
+            if not isinstance(attr_value, pd.DataFrame):
+                attr_value = pd.DataFrame(attr_value, index=df.index)
+            data[name] = attr_value
+    
     frames = []
     for key, dfi in data.items():
         cols = []
-        # vectorbt encodes parameter combinations in MultiIndex; flatten to suffixes
+        # vectorbt encodes parameter combinations in MultiIndex or as simple column values
         if isinstance(dfi.columns, pd.MultiIndex):
+            # Multi-param combinations with MultiIndex
             for tup in dfi.columns:
                 suffix = "_".join(f"{k[:1]}{v}" for k, v in zip(spec.params.keys(), tup))
                 cols.append(f"{spec.name}{('_'+key if key!='real' else '')}_{suffix}")
         else:
-            cols = [f"{spec.name}{('_'+key if key!='real' else '')}"]
+            # Simple columns (e.g., [14, 21] for RSI periods)
+            for col in dfi.columns:
+                if spec.params:
+                    # Create suffix from param names and column value
+                    # For RSI with timeperiod=[14,21], columns are [14, 21]
+                    suffix = "_".join(f"{k[:1]}{col}" for k in spec.params.keys())
+                    cols.append(f"{spec.name}{('_'+key if key!='real' else '')}_{suffix}")
+                else:
+                    # No params, just use the base name
+                    cols.append(f"{spec.name}{('_'+key if key!='real' else '')}")
+        
         dfi = dfi.copy()
         dfi.columns = cols
         frames.append(dfi)
+    
     return pd.concat(frames, axis=1) if frames else pd.DataFrame(index=df.index)
 
 def _compute_pandasta(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataFrame:
