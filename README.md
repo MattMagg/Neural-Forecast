@@ -66,6 +66,24 @@ This system delivers high-quality probabilistic forecasts for BTC at 15-minute f
 
 Built with [NeuralForecast](https://github.com/Nixtla/neuralforecast) by Nixtla for state-of-the-art neural forecasting capabilities.
 
+### Citation
+
+If you enjoy or benefit from using these Python implementations, a citation to the repository will be greatly appreciated:
+
+```bibtex
+@misc{olivares2022library_neuralforecast,
+    author={Kin G. Olivares and
+            Cristian Challú and
+            Azul Garza and
+            Max Mergenthaler Canseco and
+            Artur Dubrawski},
+    title = {{NeuralForecast}: User friendly state-of-the-art neural forecasting models.},
+    year={2022},
+    howpublished={{PyCon} Salt Lake City, Utah, US 2022},
+    url={https://github.com/Nixtla/neuralforecast}
+}
+```
+
 ---
 
 *For detailed technical information, see the [Technical Specification](docs/forecasting_sf_plan.md).*
