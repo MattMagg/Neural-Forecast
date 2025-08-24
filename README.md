@@ -22,18 +22,11 @@ This system delivers high-quality probabilistic forecasts for BTC at 15-minute f
 - **Feature engineering**: Technical indicators with multi-timeframe analysis (≤256 features)
 - **Data discipline**: UTC timestamps, regular 15-minute grid, strict leakage prevention
 
-### Production Features
-
-- **GPU-optimized**: Thunder Compute A100XL and Modal GPU support
-- **Automated setup**: One-command deployment with comprehensive validation
-- **Robust training**: Checkpointing, error recovery, and monitoring
-- **Quality gates**: Comprehensive validation and acceptance criteria
-
 ## Project Structure
 
 ```
-├── data/                    # Raw and processed datasets
-├── features/                # Feature engineering pipeline
+├── data/                   # Raw and processed datasets
+├── features/               # Feature engineering pipeline
 ├── nf_models/              # Model factory and configurations
 ├── cv/                     # Cross-validation and metrics
 ├── uq/                     # Uncertainty quantification
@@ -68,10 +61,6 @@ This system delivers high-quality probabilistic forecasts for BTC at 15-minute f
 - **Coverage diagnostics**: Empirical coverage validation
 - **PIT analysis**: Probability integral transform uniformity testing
 - **Conformal prediction**: NF's PredictionIntervals integration
-
-## Contributing
-
-This project uses an AI-assisted development framework with specialized agents for different components.
 
 ## Acknowledgments
 
