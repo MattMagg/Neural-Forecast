@@ -9,3 +9,4 @@ wheels/
 # Virtual environments
 .venv
 data/raw/btcusd_1-min_data.csv
+docs
