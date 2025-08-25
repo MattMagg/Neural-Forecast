@@ -73,13 +73,21 @@ def _compute_pandasta(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataFrame:
     frames = []
     for combo in itertools.product(*grids) if grids else [()]:
         kw = dict(zip(keys, combo)) if grids else {}
-        ser_or_df = func(df[spec.inputs[0]] if len(spec.inputs)==1 else df[list(spec.inputs)], **kw)
+        
+        # FIX: Handle donchian specially - it needs high and low as separate args
+        if spec.func == "donchian" and len(spec.inputs) == 2:
+            # donchian expects donchian(high, low, **kwargs)
+            ser_or_df = func(df[spec.inputs[0]], df[spec.inputs[1]], **kw)
+        elif len(spec.inputs) == 1:
+            ser_or_df = func(df[spec.inputs[0]], **kw)
+        else:
+            ser_or_df = func(df[list(spec.inputs)], **kw)
+            
         dfi = ser_or_df if isinstance(ser_or_df, pd.DataFrame) else ser_or_df.to_frame()
         suffix = "_".join(f"{k[:1]}{v}" for k,v in kw.items()) if kw else None
         dfi.columns = [f"{spec.name}_{c}" if suffix is None else f"{spec.name}_{c}_{suffix}" for c in dfi.columns]
         frames.append(dfi)
     return pd.concat(frames, axis=1) if frames else pd.DataFrame(index=df.index)
-
 def _compute_custom(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataFrame:
     ds = pd.DatetimeIndex(df["ds"])
     if spec.func == "minute_of_day":
