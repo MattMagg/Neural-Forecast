@@ -48,6 +48,17 @@ main() {
     log_info "=== CircleCI Environment Setup ==="
     log_info "Implementing requirements 4.1, 4.3, 4.4, 4.7"
     
+    # Ensure we're in the correct working directory
+    if [ -n "$CIRCLE_WORKING_DIRECTORY" ]; then
+        cd "$CIRCLE_WORKING_DIRECTORY"
+        log_info "Changed to working directory: $(pwd)"
+    elif [ -d "/home/circleci/project" ]; then
+        cd "/home/circleci/project"
+        log_info "Changed to default project directory: $(pwd)"
+    else
+        log_warning "Unable to determine project directory, using: $(pwd)"
+    fi
+    
     # Requirement 4.1: Verify Docker executor environment
     verify_docker_environment
     
