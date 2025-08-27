@@ -50,7 +50,9 @@ commands:
             wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
             tar -xzf ta-lib-0.4.0-src.tar.gz
             cd ta-lib/
-            ./configure --prefix=/usr
+            # Configure with CFLAGS to avoid treating warnings as errors
+            CFLAGS="-Wno-format-security" ./configure --prefix=/usr
+            # Avoid parallel make due to race conditions in gen_code
             make
             sudo make install
             sudo ldconfig

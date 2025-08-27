@@ -177,11 +177,11 @@ install_talib_library() {
     tar -xzf "ta-lib-${talib_version}-src.tar.gz"
     cd ta-lib/
     
-    # Configure with proper prefix
-    ./configure --prefix=/usr/local
+    # Configure with proper prefix and disable format warnings
+    CFLAGS="-Wno-format-security" ./configure --prefix=/usr/local
     
-    # Compile with parallel jobs
-    make -j$(nproc)
+    # Compile without parallel jobs to avoid race conditions in gen_code
+    make
     
     # Install
     sudo make install
