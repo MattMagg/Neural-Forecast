@@ -801,13 +801,13 @@ jobs:
             echo "Requirements: 4.1 (Docker executor), 4.3 (System dependencies), 4.4 (Python 3.13.6 + venv), 4.7 (Fail-fast diagnostics)"
             echo "Current directory: $(pwd)"
             echo "Directory contents: $(ls -la | head -5)"
-            
-            # Ensure we're in the project directory and execute setup script
-            cd ~/project || cd /home/circleci/project || true
             echo "Working directory: $(pwd)"
             
+            # Make script executable and run it
+            chmod +x ./.circleci/scripts/setup_environment.sh
+            
             # Execute environment setup script
-            bash ./.circleci/scripts/setup_environment.sh
+            ./.circleci/scripts/setup_environment.sh
       
       # Python environment setup with health checks
       - run:

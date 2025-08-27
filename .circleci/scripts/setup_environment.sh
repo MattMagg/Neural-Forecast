@@ -49,7 +49,10 @@ main() {
     log_info "Implementing requirements 4.1, 4.3, 4.4, 4.7"
     
     # Ensure we're in the correct working directory
-    if [ -n "$CIRCLE_WORKING_DIRECTORY" ]; then
+    # Check if we're already in a project directory
+    if [[ "$(pwd)" == */project* ]] || [ -f "requirements.txt" ]; then
+        log_info "Already in project directory: $(pwd)"
+    elif [ -n "$CIRCLE_WORKING_DIRECTORY" ]; then
         cd "$CIRCLE_WORKING_DIRECTORY"
         log_info "Changed to working directory: $(pwd)"
     elif [ -d "/home/circleci/project" ]; then
