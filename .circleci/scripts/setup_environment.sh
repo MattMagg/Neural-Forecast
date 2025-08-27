@@ -160,6 +160,9 @@ install_talib_library() {
     
     log_info "Installing TA-Lib from source..."
     
+    # Save current directory to return to after installation
+    local original_dir=$(pwd)
+    
     # Download and compile TA-Lib
     local talib_version="0.4.0"
     local talib_url="http://prdownloads.sourceforge.net/ta-lib/ta-lib-${talib_version}-src.tar.gz"
@@ -206,6 +209,9 @@ install_talib_library() {
     # Cleanup
     cd /
     rm -rf "$temp_dir"
+    
+    # Return to original directory
+    cd "$original_dir"
     
     # Verify installation
     if ldconfig -p | grep -q ta_lib; then
