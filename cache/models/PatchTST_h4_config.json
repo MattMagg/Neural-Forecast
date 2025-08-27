@@ -1,0 +1,10 @@
+{
+  "name": "PatchTST",
+  "type": "<class 'neuralforecast.models.patchtst.PatchTST'>",
+  "parameters": {
+    "input_size": 2048,
+    "horizon": 4,
+    "loss": "DistributionLoss()"
+  },
+  "config_source": "experiments/h4.yaml"
+}

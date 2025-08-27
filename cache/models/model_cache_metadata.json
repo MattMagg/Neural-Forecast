@@ -1,0 +1,208 @@
+{
+  "timestamp": "2025-08-27T04:38:41.636041+00:00",
+  "horizon": 4,
+  "frequency": "15min",
+  "models": [
+    {
+      "name": "NHITS",
+      "type": "<class 'neuralforecast.models.nhits.NHITS'>",
+      "parameters": {
+        "input_size": 1024,
+        "horizon": 4,
+        "loss": "DistributionLoss()"
+      },
+      "config_source": "experiments/h4.yaml"
+    },
+    {
+      "name": "NBEATSx",
+      "type": "<class 'neuralforecast.models.nbeatsx.NBEATSx'>",
+      "parameters": {
+        "input_size": 1024,
+        "horizon": 4,
+        "loss": "DistributionLoss()"
+      },
+      "config_source": "experiments/h4.yaml"
+    },
+    {
+      "name": "TiDE",
+      "type": "<class 'neuralforecast.models.tide.TiDE'>",
+      "parameters": {
+        "input_size": 1024,
+        "horizon": 4,
+        "loss": "DistributionLoss()"
+      },
+      "config_source": "experiments/h4.yaml"
+    },
+    {
+      "name": "PatchTST",
+      "type": "<class 'neuralforecast.models.patchtst.PatchTST'>",
+      "parameters": {
+        "input_size": 2048,
+        "horizon": 4,
+        "loss": "DistributionLoss()"
+      },
+      "config_source": "experiments/h4.yaml"
+    }
+  ],
+  "validation_results": {
+    "gpu_availability": {
+      "passed": true,
+      "message": "CUDA not available - CPU mode (expected in non-GPU environment)",
+      "details": {
+        "device": "cpu"
+      }
+    },
+    "model_instantiation_h4": {
+      "passed": true,
+      "message": "Successfully instantiated 4 models",
+      "details": {
+        "horizon_steps": 4,
+        "models": [
+          "NHITS",
+          "NBEATSx",
+          "TiDE",
+          "PatchTST"
+        ]
+      }
+    },
+    "model_instantiation_h8": {
+      "passed": true,
+      "message": "Successfully instantiated 4 models",
+      "details": {
+        "horizon_steps": 4,
+        "models": [
+          "NHITS",
+          "NBEATSx",
+          "TiDE",
+          "PatchTST"
+        ]
+      }
+    },
+    "model_instantiation_h16": {
+      "passed": true,
+      "message": "Successfully instantiated 4 models",
+      "details": {
+        "horizon_steps": 4,
+        "models": [
+          "NHITS",
+          "NBEATSx",
+          "TiDE",
+          "PatchTST"
+        ]
+      }
+    },
+    "model_instantiation_h32": {
+      "passed": true,
+      "message": "Successfully instantiated 4 models",
+      "details": {
+        "horizon_steps": 4,
+        "models": [
+          "NHITS",
+          "NBEATSx",
+          "TiDE",
+          "PatchTST"
+        ]
+      }
+    },
+    "model_instantiation_complete": {
+      "passed": true,
+      "message": "All 4 model types tested successfully",
+      "details": {
+        "model_types": [
+          "TiDE",
+          "PatchTST",
+          "NHITS",
+          "NBEATSx"
+        ],
+        "total_instances": 16
+      }
+    },
+    "loss_function_studentt": {
+      "passed": true,
+      "message": "Loss function instantiation successful",
+      "details": {
+        "loss_type": "<class 'neuralforecast.losses.pytorch.DistributionLoss'>",
+        "callable": true
+      }
+    },
+    "loss_function_mqloss": {
+      "passed": true,
+      "message": "Loss function instantiation successful",
+      "details": {
+        "loss_type": "<class 'neuralforecast.losses.pytorch.MQLoss'>",
+        "callable": true
+      }
+    },
+    "loss_function_iqloss": {
+      "passed": true,
+      "message": "Loss function instantiation successful",
+      "details": {
+        "loss_type": "<class 'neuralforecast.losses.pytorch.IQLoss'>",
+        "callable": true
+      }
+    },
+    "loss_function_validation_complete": {
+      "passed": true,
+      "message": "All 3 loss functions validated",
+      "details": {
+        "tested_losses": [
+          "studentt",
+          "mqloss",
+          "iqloss"
+        ]
+      }
+    },
+    "exog_scaler_NHITS": {
+      "passed": true,
+      "message": "Exogenous and scaler configuration validated",
+      "details": {
+        "exog_support": true,
+        "scaler_support": true
+      }
+    },
+    "exog_scaler_NBEATSx": {
+      "passed": true,
+      "message": "Exogenous and scaler configuration validated",
+      "details": {
+        "exog_support": true,
+        "scaler_support": true
+      }
+    },
+    "exog_scaler_TiDE": {
+      "passed": true,
+      "message": "Exogenous and scaler configuration validated",
+      "details": {
+        "exog_support": true,
+        "scaler_support": true
+      }
+    },
+    "exog_scaler_PatchTST": {
+      "passed": true,
+      "message": "Exogenous and scaler configuration validated",
+      "details": {
+        "exog_support": true,
+        "scaler_support": true
+      }
+    },
+    "exogenous_variable_validation": {
+      "passed": true,
+      "message": "Exogenous variable wiring validated for 4 models",
+      "details": {
+        "models_with_exog_support": 4,
+        "models_with_scaler_support": 4,
+        "hist_exog_features": 5
+      }
+    },
+    "gpu_memory_management": {
+      "passed": true,
+      "message": "GPU not available - skipping memory management tests",
+      "details": {}
+    }
+  },
+  "gpu_info": null,
+  "environment": {
+    "pytorch_version": "2.6.0",
+    "python_version": "3.13.6 (main, Aug  6 2025, 13:05:20) [Clang 17.0.0 (clang-1700.0.13.3)]",
+    "cuda_available": false
+  }
+}

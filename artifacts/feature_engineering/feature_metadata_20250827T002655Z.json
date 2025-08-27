@@ -1,0 +1,31 @@
+{
+  "timestamp": "20250827T002655Z",
+  "total_features": 28,
+  "historical_features": 26,
+  "future_features": 2,
+  "static_features": 0,
+  "sample_features": {
+    "historical": [
+      "obv",
+      "donchian_DCL_20_20_l20_u20",
+      "macd_macd_f8_s21_s9_1h",
+      "macd_macd_f12_s26_s9_1h",
+      "macd_macdsignal_f12_s26_s9_1h",
+      "macd_macdhist_f8_s21_s9_1h",
+      "macd_macdhist_f12_s26_s9_1h",
+      "mfi_t14",
+      "rsi_t7_4h",
+      "rsi_t7_1h"
+    ],
+    "future": [
+      "minute_of_day",
+      "day_of_week"
+    ],
+    "static": []
+  },
+  "data_shape": {
+    "rows": 477464,
+    "columns": 54
+  },
+  "validation_status": "PASSED"
+}

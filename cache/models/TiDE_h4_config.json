@@ -1,0 +1,10 @@
+{
+  "name": "TiDE",
+  "type": "<class 'neuralforecast.models.tide.TiDE'>",
+  "parameters": {
+    "input_size": 1024,
+    "horizon": 4,
+    "loss": "DistributionLoss()"
+  },
+  "config_source": "experiments/h4.yaml"
+}

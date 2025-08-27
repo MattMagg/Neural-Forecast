@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ModelFactoryValidation" tests="17" failures="0" time="0">
+  <testcase name="gpu_availability" classname="ModelFactoryValidation"/>
+  <testcase name="model_instantiation_h4" classname="ModelFactoryValidation"/>
+  <testcase name="model_instantiation_h8" classname="ModelFactoryValidation"/>
+  <testcase name="model_instantiation_h16" classname="ModelFactoryValidation"/>
+  <testcase name="model_instantiation_h32" classname="ModelFactoryValidation"/>
+  <testcase name="model_instantiation_complete" classname="ModelFactoryValidation"/>
+  <testcase name="loss_function_studentt" classname="ModelFactoryValidation"/>
+  <testcase name="loss_function_mqloss" classname="ModelFactoryValidation"/>
+  <testcase name="loss_function_iqloss" classname="ModelFactoryValidation"/>
+  <testcase name="loss_function_validation_complete" classname="ModelFactoryValidation"/>
+  <testcase name="exog_scaler_NHITS" classname="ModelFactoryValidation"/>
+  <testcase name="exog_scaler_NBEATSx" classname="ModelFactoryValidation"/>
+  <testcase name="exog_scaler_TiDE" classname="ModelFactoryValidation"/>
+  <testcase name="exog_scaler_PatchTST" classname="ModelFactoryValidation"/>
+  <testcase name="exogenous_variable_validation" classname="ModelFactoryValidation"/>
+  <testcase name="gpu_memory_management" classname="ModelFactoryValidation"/>
+  <testcase name="model_artifact_caching" classname="ModelFactoryValidation"/>
+</testsuite>
