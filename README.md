@@ -1,5 +1,7 @@
 # Bitcoin Forecasting System
 
+[![CI](https://github.com/MattMagg/Neural-Forecast/actions/workflows/ci.yml/badge.svg)](https://github.com/MattMagg/Neural-Forecast/actions/workflows/ci.yml)
+
 A production-ready probabilistic forecasting system for Bitcoin price prediction using 15-minute intervals with calibrated prediction intervals.
 
 ## Overview
