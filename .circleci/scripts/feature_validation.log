@@ -393,3 +393,44 @@ ValueError: Duplicate column names found: ['ds', 'ds', 'roc_t4', 'roc_t8', 'roc_
 2025-08-27 00:26:55,583 - INFO - Saved validation report: artifacts/feature_engineering/feature_validation_report_20250827T002655Z.md
 2025-08-27 00:26:55,583 - INFO - ✓ Feature engineering artifacts generated successfully
 2025-08-27 00:26:55,583 - INFO - === Feature Engineering Validation Completed Successfully ===
+2025-08-27 02:29:10,848 - INFO - Starting Feature Engineering Validation
+2025-08-27 02:29:10,848 - INFO - === Feature Registry Validation ===
+2025-08-27 02:29:10,849 - INFO - Total indicators in registry: 13
+2025-08-27 02:29:10,849 - INFO - Historical indicators: 10 - ['rsi', 'roc', 'stoch_k', 'macd', 'atr', 'nvol', 'obv', 'mfi', 'bbands', 'donchian']
+2025-08-27 02:29:10,849 - INFO - Future indicators: 3 - ['minute_of_day', 'day_of_week', 'is_weekend']
+2025-08-27 02:29:10,849 - INFO - MTF targets configured: 3 timeframes
+2025-08-27 02:29:10,849 - INFO -   30m: ['rsi', 'roc', 'atr', 'bbands']
+2025-08-27 02:29:10,849 - INFO -   1h: ['rsi', 'roc', 'atr', 'bbands', 'macd']
+2025-08-27 02:29:10,849 - INFO -   4h: ['rsi', 'atr', 'bbands']
+2025-08-27 02:29:10,849 - INFO - ✓ Feature registry validation passed
+2025-08-27 02:29:10,849 - INFO - === Feature Computation Validation ===
+2025-08-27 02:29:12,192 - INFO - Loading processed BTC data...
+2025-08-27 02:29:14,835 - INFO - Loaded 477464 rows of canonical data
+2025-08-27 02:29:14,835 - INFO - Computing base 15-minute indicators...
+2025-08-27 02:29:24,102 - INFO - Generated 30 base indicator columns
+2025-08-27 02:29:24,102 - INFO - Sample indicator columns: ['rsi_t7', 'rsi_t14', 'rsi_t28', 'roc_t4', 'roc_t8', 'roc_t16', 'roc_t32', 'stoch_k_slowk_f14_s3_s3', 'stoch_k_slowd_f14_s3_s3', 'macd_macd_f8_s21_s9']
+2025-08-27 02:29:24,102 - INFO - ✓ Found 3 columns for rsi_
+2025-08-27 02:29:24,102 - INFO - ✓ Found 4 columns for roc_
+2025-08-27 02:29:24,102 - INFO - ✓ Found 3 columns for atr_
+2025-08-27 02:29:24,102 - INFO - ✓ Found 6 columns for macd_
+2025-08-27 02:29:24,102 - INFO - ✓ Found 1 columns for bbands_
+2025-08-27 02:29:24,102 - INFO - ✓ Found 1 columns for obv
+2025-08-27 02:29:24,102 - INFO - ✓ Found 1 columns for mfi_
+2025-08-27 02:29:24,102 - INFO - Computing multi-timeframe indicators...
+2025-08-27 02:29:28,229 - INFO - Generated 41 MTF indicator columns
+2025-08-27 02:29:28,229 - WARNING - No MTF columns found for timeframe _30min
+2025-08-27 02:29:28,229 - INFO - ✓ Found 19 columns for timeframe _1h
+2025-08-27 02:29:28,229 - INFO - ✓ Found 9 columns for timeframe _4h
+2025-08-27 02:29:28,229 - INFO - Combining base and MTF indicators...
+2025-08-27 02:29:28,342 - INFO - Total combined features before processing: 71
+2025-08-27 02:29:28,343 - INFO - ✓ Feature computation validation passed
+2025-08-27 02:29:28,350 - INFO - === Shift Discipline and Leakage Prevention Validation ===
+2025-08-27 02:29:28,350 - INFO - Applying shift(1) and pruning...
+2025-08-27 02:29:28,903 - INFO - Features after shift and pruning: 52
+2025-08-27 02:29:28,903 - INFO - Historical columns to validate for shift: 50
+2025-08-27 02:29:28,967 - INFO - Testing leakage detection with assert_shifted...
+2025-08-27 02:29:29,176 - INFO - ✓ No leakage detected in historical features
+2025-08-27 02:29:29,177 - INFO - Future columns (should not be shifted): 2
+2025-08-27 02:29:29,177 - INFO - ✓ Shift discipline validation passed
+2025-08-27 02:29:29,181 - INFO - === Feature Selection Validation ===
+2025-08-27 02:29:29,181 - INFO - Testing feature selection with 256 cap...

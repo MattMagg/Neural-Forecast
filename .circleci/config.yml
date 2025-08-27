@@ -756,7 +756,7 @@ commands:
             print('All quality gates passed!')
             "
 
-  store_test_results:
+  store_test_results_and_artifacts:
     description: "Store test results and artifacts"
     steps:
       - store_test_results:
@@ -1319,8 +1319,7 @@ jobs:
       - save_processed_data_cache
       
       # Store test results and artifacts
-      - store_test_results:
-          path: test-results
+      - store_test_results_and_artifacts
       
       - store_artifacts:
           path: data/processed
@@ -1427,8 +1426,7 @@ jobs:
             - artifacts/feature_engineering
       
       # Store test results and artifacts
-      - store_test_results:
-          path: test-results
+      - store_test_results_and_artifacts
       
       - store_artifacts:
           path: artifacts/feature_engineering
@@ -1656,8 +1654,7 @@ jobs:
             - experiments/*/best
       
       # Store test results and artifacts
-      - store_test_results:
-          path: test-results
+      - store_test_results_and_artifacts
       
       - store_artifacts:
           path: cache/models
@@ -2037,8 +2034,7 @@ jobs:
             - .pytest_cache
       
       # Store test results and artifacts
-      - store_test_results:
-          path: test-results
+      - store_test_results_and_artifacts
       
       - store_artifacts:
           path: experiments
