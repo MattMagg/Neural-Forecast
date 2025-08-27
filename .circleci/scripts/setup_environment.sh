@@ -132,6 +132,7 @@ install_system_dependencies() {
         gcc \
         g++ \
         gfortran \
+        libopenblas-dev \
         make \
         curl \
         git || handle_error "Failed to install system dependencies"
