@@ -756,17 +756,7 @@ commands:
             print('All quality gates passed!')
             "
 
-  store_test_results_and_artifacts:
-    description: "Store test results and artifacts"
-    steps:
-      - store_test_results:
-          path: test-results
-      - store_artifacts:
-          path: test-results
-          destination: test-results
-      - store_artifacts:
-          path: coverage
-          destination: coverage
+  # Removed store_test_results_and_artifacts command - using built-in steps directly instead
 
 # Executors for different job types
 executors:
@@ -1319,7 +1309,7 @@ jobs:
       - save_processed_data_cache
       
       # Store test results and artifacts
-      - store_test_results_and_artifacts
+      # Note: Skipping test result storage as we don't have JUnit XML format results yet
       
       - store_artifacts:
           path: data/processed
@@ -1426,7 +1416,7 @@ jobs:
             - artifacts/feature_engineering
       
       # Store test results and artifacts
-      - store_test_results_and_artifacts
+      # Note: Skipping test result storage as we don't have JUnit XML format results yet
       
       - store_artifacts:
           path: artifacts/feature_engineering
@@ -1654,7 +1644,7 @@ jobs:
             - experiments/*/best
       
       # Store test results and artifacts
-      - store_test_results_and_artifacts
+      # Note: Skipping test result storage as we don't have JUnit XML format results yet
       
       - store_artifacts:
           path: cache/models
@@ -2034,7 +2024,7 @@ jobs:
             - .pytest_cache
       
       # Store test results and artifacts
-      - store_test_results_and_artifacts
+      # Note: Skipping test result storage as we don't have JUnit XML format results yet
       
       - store_artifacts:
           path: experiments
