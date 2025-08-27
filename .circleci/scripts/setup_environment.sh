@@ -114,13 +114,12 @@ install_system_dependencies() {
     sudo apt-get install -y \
         build-essential \
         wget \
-        libta-lib-dev \
         pkg-config \
         gcc \
         g++ \
         make \
         curl \
-        git
+        git || handle_error "Failed to install system dependencies"
     
     # Verify build tools installation
     for tool in gcc g++ make pkg-config wget curl git; do

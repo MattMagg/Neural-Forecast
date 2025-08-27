@@ -45,14 +45,15 @@ commands:
           name: "Install system dependencies"
           command: |
             sudo apt-get update
-            sudo apt-get install -y build-essential wget libta-lib-dev
-            # TA-Lib C library installation
+            sudo apt-get install -y build-essential wget
+            # TA-Lib C library installation from source
             wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
             tar -xzf ta-lib-0.4.0-src.tar.gz
             cd ta-lib/
             ./configure --prefix=/usr
             make
             sudo make install
+            sudo ldconfig
             cd ..
             rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
 
@@ -214,11 +215,9 @@ commands:
             - restore_cache:
                 name: "Restore processed data cache"
                 keys:
-                  # Primary: Raw data checksum + processing version
-                  - v2-data-{{ checksum "data/raw/btcusd_1-min_data.csv" }}-{{ checksum "utils/io.py" }}
-                  # Fallback 1: Raw data checksum only
-                  - v2-data-{{ checksum "data/raw/btcusd_1-min_data.csv" }}
-                  # Fallback 2: Any processed data
+                  # Primary: Processing version
+                  - v2-data-{{ checksum "utils/io.py" }}-{{ checksum "requirements.txt" }}
+                  # Fallback: Any processed data
                   - v2-data-
             - run:
                 name: "Validate processed data cache"
@@ -242,14 +241,14 @@ commands:
           steps:
             - save_cache:
                 name: "Save processed data cache"
-                key: v2-data-{{ checksum "data/raw/btcusd_1-min_data.csv" }}-{{ checksum "utils/io.py" }}
+                key: v2-data-{{ checksum "utils/io.py" }}-{{ checksum "requirements.txt" }}
                 paths:
                   - data/processed
             - run:
                 name: "Processed data cache report"
                 command: |
                   echo "=== Processed Data Cache Report ==="
-                  echo "Cache key: v2-data-{{ checksum "data/raw/btcusd_1-min_data.csv" }}-{{ checksum "utils/io.py" }}"
+                  echo "Cache key: v2-data-{{ checksum "utils/io.py" }}-{{ checksum "requirements.txt" }}"
                   echo "Cached files:"
                   find data/processed -name "*.parquet" -exec ls -lh {} \; 2>/dev/null || echo "No parquet files found"
                   echo "Total cache size: $(du -sh data/processed/ 2>/dev/null || echo 'N/A')"

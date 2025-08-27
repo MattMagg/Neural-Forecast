@@ -1,0 +1,23 @@
+version: 2.1
+
+parameters:
+  run_foundation_tests:
+    type: boolean
+    default: true
+
+jobs:
+  simple_test:
+    docker:
+      - image: cimg/python:3.13
+    steps:
+      - checkout
+      - run:
+          name: "Test"
+          command: echo "Testing CircleCI"
+
+workflows:
+  version: 2
+  foundation_pipeline:
+    when: << pipeline.parameters.run_foundation_tests >>
+    jobs:
+      - simple_test
