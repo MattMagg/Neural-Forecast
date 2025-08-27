@@ -131,12 +131,13 @@ install_system_dependencies() {
         pkg-config \
         gcc \
         g++ \
+        gfortran \
         make \
         curl \
         git || handle_error "Failed to install system dependencies"
     
     # Verify build tools installation
-    for tool in gcc g++ make pkg-config wget curl git; do
+    for tool in gcc g++ gfortran make pkg-config wget curl git; do
         if command -v "$tool" >/dev/null 2>&1; then
             log_success "$tool installed successfully"
         else
