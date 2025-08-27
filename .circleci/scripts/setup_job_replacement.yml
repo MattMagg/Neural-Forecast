@@ -1,0 +1,53 @@
+  setup:
+    executor: python-docker
+    steps:
+      # Initial setup and cache restoration
+      - checkout
+      - cleanup_failed_caches
+      - restore_system_cache
+      - restore_talib_cache
+      - restore_python_dependencies
+      - restore_processed_data_cache
+      
+      # Environment setup using dedicated script (Requirements 4.1, 4.3, 4.4, 4.7)
+      - run:
+          name: "Environment Setup"
+          command: |
+            echo "=== CircleCI Environment Setup Job ==="
+            echo "Implementing Docker-based environment setup with Python 3.13.6"
+            echo "Requirements: 4.1 (Docker executor), 4.3 (System dependencies), 4.4 (Python 3.13.6 + venv), 4.7 (Fail-fast diagnostics)"
+            
+            # Execute environment setup script
+            ./.circleci/scripts/setup_environment.sh
+      
+      # Environment validation using dedicated script
+      - run:
+          name: "Environment Validation"
+          command: |
+            echo "=== Environment Validation ==="
+            
+            # Activate virtual environment for validation
+            source .venv/bin/activate
+            
+            # Run comprehensive validation
+            python ./.circleci/scripts/validate_environment_setup.py
+      
+      # Cache saving
+      - save_system_cache
+      - save_talib_cache
+      - save_python_dependencies
+      
+      # Environment validation and cache reporting
+      - validate_environment
+      - validate_all_caches
+      - monitor_cache_performance:
+          job_name: "setup"
+      - generate_cache_report
+      
+      # Workspace persistence
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .venv
+            - data/processed
+            - "*"

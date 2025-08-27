@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Literal, Optional, Tuple, Any
 
 Kind = Literal["hist","futr","stat"]
-TF = Literal["15min","30min","1h","4h"]
+TF = Literal["15m","30m","1h","4h"]
 
 @dataclass
 class IndicatorSpec:
@@ -13,7 +13,7 @@ class IndicatorSpec:
     params: Dict[str, List[Any]]     # cartesian grid; vectorbt will broadcast when lib=talib
     inputs: Tuple[str, ...]          # source columns, e.g. ("close",) or ("high","low","close")
     kind: Kind                       # "hist" or "futr" or "stat"
-    tf: TF = "15min"                 # base timeframe unless specified
+    tf: TF = "15m"                 # base timeframe unless specified
     post: Optional[str] = None       # optional post-processing: e.g., "bandwidth", "zscore"
 
 # Pragmatic starter set (tight, not bloated).
@@ -60,7 +60,7 @@ REGISTRY: List[IndicatorSpec] = [
 
 # MTF policy: compute these also on higher TFs and merge down (EOB-aligned) later.
 MTF_TARGETS: List[Tuple[TF, List[str]]] = [
-    ("30min", ["rsi","roc","atr","bbands"]),
+    ("30m", ["rsi","roc","atr","bbands"]),
     ("1h",    ["rsi","roc","atr","bbands","macd"]),
     ("4h",    ["rsi","atr","bbands"]),
 ]

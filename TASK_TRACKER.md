@@ -1,33 +1,10 @@
 # Task Tracker
 
-## Update Instructions
+## Project Metadata
 
-When updating this document:
-
-1. Provide enough detail for other agents to understand what was implemented
-2. Include file paths and function/class names created
-3. Add tags to indicate task type
-4. Update version numbers according to semantic versioning (see docs/versioning_system.md)
-5. Keep technical details but remove celebratory language
-6. Update task counts in the status table
-7. Record actual implementation details, not just task names
-
-## Task Tags
-
-- **[SCRIPT]** - Python implementation files
-- **[CONFIG]** - Configuration files (YAML, JSON, registry)
-- **[VALIDATION]** - Testing and verification tasks
-- **[ANALYSIS]** - Data analysis or feature selection tasks
-- **[DOC]** - Documentation creation or updates
-- **[INFRA]** - Infrastructure or environment setup
-- **[MODEL]** - Model training or deployment tasks
-- **[DEPENDENCY]** - Package installation or dependency management
-
----
-
-## Project Version: 0.5.2.4
-
-**Last Updated**: 2025-08-24
+**Current Version**: 0.5.2.11  
+**Last Updated**: 2025-08-27  
+**Branch**: instance-training-v0.5.2.X
 
 ## Specifications Status
 
@@ -41,334 +18,251 @@ When updating this document:
 | infrastructure-setup | COMPLETED | 6/6 | Thunder Compute & Modal GPU setup, documentation reorganization |
 | thunder-compute-setup | COMPLETED | 3/3 | Pre-installed software compatibility, setup automation |
 | training-guide-vscode-optimization | COMPLETED | 1/1 | Foundation workflow documentation complete |
+| circleci-foundation-setup | COMPLETED | 7/7 | Complete CI/CD foundation with GPU support, validation jobs, caching system |
+
+## Update Instructions
+
+When updating this document:
+
+1. Copy the template below and paste it at the top of the Changelog section
+2. Provide enough detail for other agents to understand what was implemented
+3. Include file paths and function/class names created
+4. Add tags to indicate task type
+5. Update version numbers according to semantic versioning (see docs/versioning_system.md)
+6. Keep technical details but remove celebratory language
+7. Update the specifications status table if completing a spec
+8. Record actual implementation details, not just task names
+
+## Task Tags
+
+- **[SCRIPT]** - Python implementation files
+- **[CONFIG]** - Configuration files (YAML, JSON, registry)
+- **[VALIDATION]** - Testing and verification tasks
+- **[ANALYSIS]** - Data analysis or feature selection tasks
+- **[DOC]** - Documentation creation or updates
+- **[INFRA]** - Infrastructure or environment setup
+- **[MODEL]** - Model training or deployment tasks
+- **[DEPENDENCY]** - Package installation or dependency management
+
+## Update Template
+
+```markdown
+---
+
+## [Spec/Task Name]
+
+**Status**: [IN_PROGRESS | COMPLETED | BLOCKED]  
+**Version**: [X.X.X]  
+**Date**: [YYYY-MM-DD]  
+**Spec Location**: [Path to spec if applicable]  
+**Tags**: [SCRIPT] [CONFIG] [VALIDATION] [ANALYSIS] [DOC] [INFRA] [MODEL] [DEPENDENCY]
+
+### Summary
+[Brief description of what was implemented/changed]
+
+### Tasks Completed
+- [ ] **Task Name**: [Brief description] **[TAG]**
+  - Implementation details
+  - Files affected: `path/to/file.py`
+  - Functions/classes created: function_name(), ClassName
+  - Key changes and rationale
+
+### Files Created/Modified
+- `path/to/file1.py` - [Brief description of changes]
+- `path/to/file2.yaml` - [Brief description of changes]
+
+### Issues/Blockers
+[Any issues encountered or remaining blockers]
+
+### Next Steps
+[What needs to be done next, if applicable]
+```
 
 ---
 
-## Data Processing Validation Spec
-
-**Status**: COMPLETED  
-**Version**: 0.1.0  
-**Spec Location**: `.kiro/specs/data-processing-validation/`
-
-### Task Completion
-
-- [x] **Task 0**: 1-minute to 15-minute aggregation **[SCRIPT]**
-  - `utils/io.py`: `aggregate_1min_to_15min()` - OHLCV aggregation with proper rules (open=first, high=max, low=min, close=last, volume=sum)
-  - Handles Unix timestamp conversion to UTC with EOB alignment
-  
-- [x] **Task 1**: Validation utilities **[VALIDATION]**
-  - `utils/validate.py`: Created 4 validation functions
-    - `assert_regular_grid()` - Validates 15-min grid completeness
-    - `assert_utc_eob()` - Verifies UTC timezone and EOB alignment
-    - `assert_shifted()` - Correlation-based leakage detection
-    - `assert_no_forward_fill_y()` - Prevents target forward-fill
-  
-- [x] **Task 2**: Data processing functions **[SCRIPT]**
-  - `utils/io.py`: Core processing pipeline
-    - `regularize_to_grid_utc()` - UTC conversion and grid creation with NaN for missing bars
-    - `make_nf_canonical()` - Creates NF schema with log returns computation
-    - `drop_train_nans_and_winsorize()` - Quantile clipping (0.1%, 99.9%) for training stability
-  
-- [x] **Task 3**: Training pipeline integration **[SCRIPT]**
-  - `run_train.py`: Complete assembly sequence
-    - Load 1-min → aggregate to 15-min → regularize → canonical → validate
-    - Command-line interface with `--raw-data`, `--output-dir`, `--save-processed`
-    - All validation gates integrated before model training
-  
-- [x] **Task 4**: Implementation testing **[VALIDATION]**
-  - Validated against 7.16M 1-minute bars → 477K 15-minute bars
-  - All 10 requirements from spec passed testing
-
-### Files Created/Modified
-
-- `utils/io.py` - Data I/O and processing (7 functions)
-- `utils/validate.py` - Validation suite (4 functions)
-- `run_train.py` - Training pipeline entry point
+# CHANGELOG (Latest First)
 
 ---
 
-## Feature Engineering Pipeline Spec
+## CircleCI Foundation Setup
 
 **Status**: COMPLETED  
-**Version**: 0.3.0  
-**Spec Location**: `.kiro/specs/feature-engineering-pipeline/`
+**Version**: 0.5.2.11  
+**Date**: 2025-08-27  
+**Spec Location**: `.kiro/specs/circleci-foundation-setup/`  
+**Tags**: [CONFIG] [INFRA] [SCRIPT] [VALIDATION] [DEPENDENCY]
 
-### Task Completion
+### Summary
+Complete CircleCI CI/CD foundation implementation supporting current BTC forecasting system (specs 1-4) with scalable architecture for future specifications (specs 5-14). Includes comprehensive caching system, GPU support, validation jobs, and artifact management.
 
-- [x] **Task 1**: Registry creation **[CONFIG]**
-  - `features/registry.py`:
-    - `IndicatorSpec` dataclass with fields: name, lib, func, params, inputs, kind, tf, post
-    - `REGISTRY` list with 13 indicators (RSI, ROC, STOCH, MACD, ATR, nvol, OBV, MFI, BBANDS, Donchian, calendar features)
-    - `MTF_TARGETS` dict: 30min [rsi,roc,atr,bbands], 1h [rsi,roc,atr,bbands,macd], 4h [rsi,atr,bbands]
+### Tasks Completed
+- [x] **Base Configuration Structure**: Version 2.1 CircleCI config with modular architecture **[CONFIG]**
+  - 4-parameter system (foundation tests, GPU tests, cache strategy, Python version)
+  - Reusable commands and orb imports
+  - Files created: `.circleci/config.yml`
   
-- [x] **Task 2**: Computation functions **[SCRIPT]**
-  - `features/builder.py`:
-    - `_compute_talib()` - vectorbt.IndicatorFactory wrapper with parameter broadcasting
-    - `_compute_pandasta()` - pandas-ta integration with itertools.product
-    - `_compute_custom()` - Calendar features (minute_of_day, day_of_week, is_weekend)
-    - `build_indicators()` - Main orchestrator with BBANDS bandwidth post-processing
+- [x] **Comprehensive Caching System**: Multi-level dependency caching **[INFRA]**
+  - Python, TA-Lib, processed data, model artifacts, system packages
+  - Fallback strategies, validation, cleanup, performance monitoring
+  - Files created: `.circleci/scripts/validate_caching_system.py`
   
-- [x] **Task 3**: MTF functions **[SCRIPT]**
-  - `features/builder.py`:
-    - `_compute_mtf_one()` - Uses freqtrade's resample_to_interval for single TF
-    - `apply_mtf()` - Orchestrates multi-timeframe computation and merging
+- [x] **Environment Setup Job**: Docker-based Python 3.13 environment **[INFRA]**
+  - System dependencies (TA-Lib C library)
+  - Virtual environment management
+  - Health checks
   
-- [x] **Task 4**: Postprocess and shift **[SCRIPT]**
-  - `features/builder.py`:
-    - `postprocess_shift_and_prune()` - Applies shift(1) to historical features
-    - Availability filter: drops features with <98% non-NaN values
-    - Near-constant detection: removes features with ≤3 unique values
+- [x] **Data Processing Validation**: Complete pipeline validation **[VALIDATION]**
+  - Using existing utils/io.py
+  - All 4 quality gates (assert_regular_grid, assert_utc_eob, assert_shifted, assert_no_forward_fill_y)
+  - NF canonical schema compliance
+  - Files created: `.circleci/scripts/validate_data_processing.py`
   
-- [x] **Task 5**: Feature selection **[SCRIPT]** **[ANALYSIS]**
-  - `features/builder.py`:
-    - `select_features()` - Returns (hist_cols, futr_cols, stat_cols) lists
-    - Correlation pruning: Spearman |rho| ≥ 0.95 threshold
-    - Hard cap: 256 features max with futr/stat priority, hist ranked by variance
+- [x] **Feature Engineering Validation**: Testing indicator pipeline **[VALIDATION]**
+  - 13 technical indicators via features/registry.py and features/builder.py
+  - MTF alignment, shift(1) discipline, ≤256 cap validation
+  - Files created: `.circleci/scripts/validate_feature_engineering.py`
   
-- [x] **Task 6**: Pipeline integration **[SCRIPT]**
-  - `run_train.py`: Added `integrate_features()` function with exact Section 3.4 code
-  - `run_predict.py`: Created with mirrored feature pipeline for inference
-  - Both use `assert_shifted()` validation before NeuralForecast calls
+- [x] **Model Factory Validation (GPU)**: GPU-enabled testing **[MODEL]**
+  - linux-cuda-12:default and gpu.nvidia.medium resource class
+  - All 4 models (NHITS, NBEATSx, TiDE, PatchTST)
+  - Loss functions (DistributionLoss, MQLoss, IQLoss)
+  - Files created: `.circleci/scripts/validate_model_factory.py`
   
-- [x] **Task 7**: Core tests **[VALIDATION]**
-  - `tests/test_features.py`: 4 tests
-    - `test_no_leak()` - Verifies shift(1) prevents future information leakage
-    - `test_mtf_alignment()` - Validates 09:00-09:45 holds 08:00-09:00 value
-    - `test_feature_cap()` - Ensures ≤256 features
-    - `test_deterministic()` - Confirms identical outputs on repeated runs
-  
-- [x] **Task 8**: Hygiene tests **[VALIDATION]**
-  - `tests/test_hygiene.py`: 7 tests
-    - `test_shift_timing()` - 10:00 bar not used for 10:00 prediction
-    - `test_eob_grid()` - EOB alignment to 15-min boundaries
-    - `test_nan_warmup()` - 98% availability threshold
-    - `test_bbands_bandwidth_only()` - Only bandwidth kept, not upper/middle/lower
-    - `test_vectorbt_broadcasting()` - Efficient parameter array broadcasting
-    - Plus 2 additional boundary case tests
+- [x] **Cross-Validation Job (GPU)**: NF-native CV execution **[MODEL]**
+  - Using existing cv/runner.py
+  - sCRPS computation, coverage and PIT diagnostics
+  - Model persistence testing, GPU memory management
+  - Files created: `.circleci/scripts/validate_cross_validation.py`
 
 ### Files Created/Modified
-
-- `features/registry.py` - Indicator specifications and MTF targets
-- `features/builder.py` - Complete feature computation pipeline (8 functions)
-- `run_train.py` - Modified with feature integration
-- `run_predict.py` - New inference pipeline
-- `tests/test_features.py` - 4 core tests
-- `tests/test_hygiene.py` - 7 hygiene tests
+- `.circleci/config.yml` - Complete 2200+ line CircleCI configuration
+- `.circleci/scripts/validate_cross_validation.py` - CV validation with NF-native testing
+- `.circleci/scripts/validate_model_factory.py` - Model factory validation with GPU support
+- `.circleci/scripts/validate_caching_system.py` - Caching system validation
+- `.circleci/scripts/validate_data_processing.py` - Data pipeline validation
+- `.circleci/scripts/validate_feature_engineering.py` - Feature engineering validation
+- `.circleci/scripts/circleci-caching-system.md` - Caching system documentation
+- `.circleci/scripts/FEATURE_ENGINEERING_VALIDATION_SUMMARY.md` - Feature validation summary
 
 ---
 
-## NeuralForecast Model Factory Spec
+## Training Guide VSCode Optimization
 
 **Status**: COMPLETED  
-**Version**: 0.4.0  
-**Spec Location**: `.kiro/specs/neuralforecast-model-factory/`
+**Version**: 0.5.2.0  
+**Date**: 2025-08-22  
+**Spec Location**: `.kiro/specs/training-guide-vscode-optimization/`  
+**Tags**: [DOC]
 
-### Task Completion
+### Summary
+Complete rewrite of training guide focusing on foundation workflow with notebook-based execution.
 
-- [x] **Tasks 1-10**: Core implementation **[SCRIPT]** **[CONFIG]** **[VALIDATION]**
-  - `nf_models/factory.py`:
-    - `instantiate_models()` - Main factory function accepting hist_cols, futr_cols, stat_cols
-    - `_loss_ctor()` - Creates DistributionLoss("StudentT"), MQLoss, or IQLoss
-    - `_prune_kwargs()` - Filters unsupported model parameters using inspect.signature
-    - `_apply_model_defaults()` - Sets model-specific defaults (input_size, layers, etc.)
-    - Model support: NHITS, NBEATSx, TiDE, PatchTST
-    - Scaler handling: robust (default), revin (PatchTST)
-  - `experiments/h{4,8,16,32}.yaml`:
-    - Horizon-specific configurations with all 4 models
-    - Loss specifications, training parameters, CV settings
-  - Test suite with 6 validation functions in factory.py
-  
-- [x] **Task 11**: NeuralForecast orchestrator integration **[SCRIPT]** **[DOC]**
-  - `nf_models/01_model_factory_core.ipynb`: Section 7 - NF integration testing
-  - Validates NeuralForecast(models, freq) instantiation
-  - Tests fit/predict/cross_validation workflows
-  
-- [x] **Task 12**: Error handling and diagnostics **[SCRIPT]**
-  - `nf_models/01_model_factory_core.ipynb`: Enhanced error classes
-  - ConfigurationError and ModelInstantiationError with detailed messages
-  - Comprehensive validation functions with diagnostic output
-  
-- [x] **Task 13**: Integration tests with run_train.py **[VALIDATION]**
-  - `nf_models/02_integration_tests.ipynb`: Complete end-to-end testing
-  - Tests all 4 models × 4 horizons = 16 combinations
-  - Cross-validation with n_windows=2 for fast validation
-  - Save/load functionality verification
-  
-- [x] **Task 14**: Performance and memory optimization **[ANALYSIS]** **[DOC]**
-  - `nf_models/03_performance_profiling.ipynb`: Comprehensive profiling
-  - Memory usage analysis for feature counts (10, 50, 100, 256)
-  - GPU memory estimation formulas
-  - Batch size recommendations for M4 Pro and A100
-  - Risk mitigation strategies for OOM, MTF misalignment, quantile crossing
-  
-- [x] **Task 15**: Documentation and usage examples **[DOC]**
-  - `nf_models/04_usage_documentation.ipynb`: Complete user guide
-  - Interactive model builder with widgets
-  - 5+ working examples
-  - Troubleshooting guide for 8 common errors
-  - A100 migration instructions
-  
-- [x] **Task 16**: Final validation and testing **[VALIDATION]**
-  - `nf_models/04_usage_documentation.ipynb`: Section 8 - Quality gates
-  - All acceptance criteria from Section 12 validated
-  - sCRPS < baseline, coverage ±2pp, latency <100ms
-  - Quality dashboard shows all green
+### Tasks Completed
+- [x] **Foundation Workflow Guide**: Update TRAINING_GUIDE.md **[DOC]**
+  - 3-step process: setup.sh → kaggle_download_btc.py → run_train.ipynb
+  - Cell-by-cell execution guidance with expected outputs
+  - A100XL-specific optimizations and batch sizes
+  - Comprehensive troubleshooting section
 
 ### Files Created/Modified
-
-- `nf_models/factory.py` - Model instantiation system (905 lines)
-- `nf_models/factory_core.py` - Exported Python module
-- `nf_models/01_model_factory_core.ipynb` - Core implementation notebook
-- `nf_models/02_integration_tests.ipynb` - Integration testing notebook
-- `nf_models/03_performance_profiling.ipynb` - Performance analysis notebook
-- `nf_models/04_usage_documentation.ipynb` - Documentation and quality validation
-- `experiments/experiment_configs.ipynb` - Configuration management notebook
-- `experiments/small_sample_generation.ipynb` - Test data generation notebook
-- `experiments/h4.yaml` - 1-hour horizon config
-- `experiments/h8.yaml` - 2-hour horizon config  
-- `experiments/h16.yaml` - 4-hour horizon config
-- `experiments/h32.yaml` - 8-hour horizon config
-
-### Validation Issues Fixed **[VALIDATION]**
-
-After nf-validation-expert agent review, 4 critical issues were identified and resolved:
-
-- **Issue 1: PatchTST Exogenous Support**
-  - Problem: Spec assumed PatchTST supports exogenous variables but it doesn't
-  - Fix: Updated `_prune_kwargs()` in factory.py to remove exog params for PatchTST with warning
-
-- **Issue 2: DistributionLoss Missing Parameter**
-  - Problem: Missing `return_params=True` for probabilistic outputs
-  - Fix: Added parameter to DistributionLoss instantiation in factory.py line 70
-
-- **Issue 3: Missing Imports**
-  - Problem: Documentation notebook missing sCRPS, PredictionIntervals imports
-  - Fix: Added all required imports to 04_usage_documentation.ipynb setup cell
-
-- **Issue 4: Simulated Metrics**
-  - Problem: Acceptance criteria used fake metrics instead of real calculations
-  - Fix: Replaced with actual metric calculations using NF native functions
+- `docs/workflows/TRAINING_GUIDE.md` - Complete foundation workflow guide
+- `.kiro/specs/training-guide-vscode-optimization/requirements.md` - Requirements specification
+- `.kiro/specs/training-guide-vscode-optimization/design.md` - Architecture and design decisions
+- `.kiro/specs/training-guide-vscode-optimization/tasks.md` - Implementation task breakdown
 
 ---
 
-## Cross-Validation and Metrics Spec
+## Thunder Compute Setup
 
 **Status**: COMPLETED  
-**Version**: 0.5.0  
-**Spec Location**: `.kiro/specs/cross-validation-metrics/`
+**Version**: 0.5.1.3  
+**Date**: 2025-08-22  
+**Spec Location**: `.kiro/specs/thunder-compute-setup/`  
+**Tags**: [SCRIPT] [INFRA] [DOC]
 
-### Task Completion
+### Summary
+Automated setup script and guides for Thunder Compute A100XL instances with pre-installed software compatibility.
 
-- [x] **Tasks 1-3**: Foundation Setup **[SCRIPT]** **[CONFIG]**
-  - `cv/runner.py`: Core CV execution module
-    - `run_cv()` - NF-native cross_validation with windowing parameters (n_windows, step_size=h, val_size=4*h, refit=1)
-    - `summarize_cv()` - Complete metrics orchestration and model selection
-    - `_validate_cv_results()` - Comprehensive CV output validation
-  - `cv/__init__.py` - Module exports
-  - `uq/metrics.py` - sCRPS and supporting metrics module
-  - `uq/calibration.py` - Coverage and PIT diagnostics module  
-  - `utils/io.py` - Enhanced artifact persistence
-
-- [x] **Tasks 4-5**: Metrics Computation **[SCRIPT]**
-  - `uq/metrics.py`: Complete metrics implementation
-    - `compute_scrps()` - Uses NeuralForecast's native sCRPS implementation
-    - `compute_mae()`, `compute_rmse()`, `compute_bias()` - Supporting metrics
-    - `compute_metrics_per_model()` - Per-window metrics computation
-    - `aggregate_metrics()` - Cross-window statistics (mean, std, min, max)
-    - Support for distributional (StudentT) and quantile (MQLoss/IQLoss) models
-
-- [x] **Tasks 6-9**: Aggregation and Visualization **[SCRIPT]**
-  - `cv/runner.py`: Enhanced aggregation capabilities
-    - `aggregate_metrics_with_ci()` - Confidence intervals using mean ± 1.96*std/sqrt(n)
-    - Visualization orchestration calling `uq/calibration.py` functions
-    - Conformal prediction support via NF's PredictionIntervals
-  - `uq/calibration.py`: Complete calibration diagnostics
-    - `compute_coverage()` - Empirical coverage at 80/90/95% with ±2pp tolerance
-    - `compute_pit()` - PIT with dense quantile grid [1-99] for uniformity assessment
-    - `plot_calibration_diagnostics()` - 20-bin PIT histograms, coverage plots
-
-- [x] **Tasks 10-15**: Model Selection and Persistence **[SCRIPT]**
-  - `cv/runner.py`: Model selection logic
-    - `select_best_models()` - sCRPS-based ranking with 1% improvement guardrails
-    - `save_selected_models()` - NF-native model saving with timestamped filenames
-    - Best distributional (StudentT) and quantile (MQLoss/IQLoss) identification
-  - `utils/io.py`: Comprehensive artifact management
-    - Timestamped persistence (YYYYMMDDTHHMMSSZ format)
-    - CV results, metrics, leaderboard saving to experiments/h{horizon}/
-
-- [x] **Task 16**: Pipeline Integration **[SCRIPT]**
-  - `run_train.py`: Complete CV integration following docs/forecasting_sf_plan.md lines 1770-1801
-    - 6-step workflow: fit → insample → CV → summarize → persist
-    - Progress logging with window-by-window tracking
-    - Error recovery with retry logic and partial failure handling
-  - `test_cv_integration.py`: End-to-end integration test script
-
-- [x] **Tasks 17-18**: Comprehensive Testing **[VALIDATION]**
-  - `tests/test_cv.py`: 45+ unit tests covering:
-    - sCRPS computation accuracy for all model types
-    - Coverage calculation correctness with ±2pp validation
-    - PIT uniformity testing with KS statistics
-    - Metrics aggregation and ranking algorithms
-  - `tests/test_cv_integration.py`: 30+ integration tests covering:
-    - Complete CV workflow with realistic data
-    - Artifact persistence and loading
-    - Error handling and recovery scenarios
-    - Performance benchmarks
-
-- [x] **Tasks 19-20**: Documentation and Examples **[DOC]**
-  - `cv/README.md` - Complete module documentation
-  - `docs/cv_user_guide.md` - Comprehensive user guide
-  - `docs/cv_troubleshooting.md` - Common issues and solutions
-  - `docs/debugging_guide.md` - Error recovery protocols
-  - `examples/cv/` - 5 runnable Jupyter notebooks:
-    - `01_basic_cv_example.ipynb` - Simple CV execution
-    - `02_metrics_analysis.ipynb` - Understanding sCRPS and coverage
-    - `03_calibration_diag.ipynb` - PIT and coverage analysis
-    - `04_model_selection.ipynb` - Model ranking and selection
-    - `05_performance_tuning.ipynb` - Optimization strategies
-
-### Risk Mitigation Implementation **[SCRIPT]**
-
-- `utils/error_recovery.py`: Comprehensive error handling protocols
-  - Memory exhaustion: Progressive batch_size reduction, GPU monitoring
-  - sCRPS failures: Numerical stability checks, fallback strategies
-  - Coverage issues: Conformal prediction integration, IQLoss fallbacks
-  - PIT errors: Quantile grid validation, uniformity testing
-- `utils/risk_mitigation.py`: Risk prevention systems
-  - MTF alignment validation, data leakage detection
-  - Quantile crossing prevention, GPU memory management
+### Tasks Completed
+- [x] **Setup Script**: Thunder Compute automated setup **[SCRIPT]** **[INFRA]**
+  - Pre-installed software detection (CUDA 12.9, PyTorch 2.7.1, JupyterLab)
+  - Python 3.13.6 installation from deadsnakes PPA
+  - TA-Lib C library installation
+  - Virtual environment creation and dependency management
+  - PyTorch upgrade from 2.7.1 to 2.8.0 for CUDA 12.9 compatibility
+  
+- [x] **Training Guide**: A100XL-specific documentation **[DOC]**
+  - Optimal batch sizes for 80GB VRAM
+  - GPU monitoring commands
+  - Performance optimization tips
+  
+- [x] **Cleanup Scripts**: Utility and recovery scripts **[SCRIPT]** **[INFRA]**
+  - Multi-mode cleanup for failed installations
+  - Docker testing integration
+  - Validation utilities
 
 ### Files Created/Modified
+- `setup.sh` - Thunder Compute automated setup script
+- `TRAINING_GUIDE.md` - A100XL training guide
+- `THUNDER_SETUP_GUIDE.md` - Quick setup guide
+- `cleanup.sh` - Multi-mode cleanup script
+- `test_setup_docker.sh` - Docker container testing script
+- `.kiro/specs/thunder-compute-setup/` - Specification documents
 
-- `cv/runner.py` - Core CV execution and orchestration (850+ lines)
-- `cv/__init__.py` - Module exports and organization
-- `uq/metrics.py` - Metrics computation system (600+ lines)
-- `uq/calibration.py` - Calibration diagnostics (700+ lines)
-- `uq/__init__.py` - UQ module exports
-- `utils/io.py` - Enhanced artifact persistence (400+ lines)
-- `utils/error_recovery.py` - Error handling protocols (500+ lines)
-- `utils/risk_mitigation.py` - Risk prevention (400+ lines)
-- `run_train.py` - Enhanced with CV integration
-- `tests/test_cv.py` - Comprehensive unit tests (1100+ lines)
-- `tests/test_cv_integration.py` - Integration tests (1200+ lines)
-- `docs/cv_user_guide.md` - User documentation
-- `docs/cv_troubleshooting.md` - Troubleshooting guide
-- `docs/debugging_guide.md` - Error recovery documentation
-- `examples/cv/*.ipynb` - 5 example notebooks
+---
 
-### Acceptance Validation **[VALIDATION]**
+## Issue #1: vectorbt API Compatibility & Data Pipeline
 
-**Status**: 100% PASS - All 10 requirements and 80 acceptance criteria met
+**Status**: RESOLVED  
+**Version**: 0.5.2.4  
+**Date**: 2025-08-24  
+**Tags**: [DEPENDENCY] [SCRIPT] [VALIDATION]
 
-- NF-native implementation: Uses `NeuralForecast.cross_validation()` exclusively
-- sCRPS as primary metric: Correct NF implementation with distributional/quantile support
-- Coverage diagnostics: ±2pp tolerance validation at 80/90/95% levels
-- PIT analysis: Dense quantile grid with uniformity testing
-- Conformal integration: NF's PredictionIntervals properly configured
-- Leakage prevention: Complete validation with `assert_shifted()` checks
-- Model persistence: NF-native save/load with proper versioning
-- Training integration: Full pipeline integration following specification
-- Production readiness: Comprehensive error handling and monitoring
+### Summary
+Complete resolution of data pipeline issues preventing GPU training execution.
+
+### Issues Resolved
+- [x] **vectorbt API Compatibility**: Fixed in v0.5.2.3 **[DEPENDENCY]**
+  - Error: AttributeError - RSI object has no attribute '_results'
+  - Location: features/builder.py line 22
+  - Solution: Modified to use output_names and getattr()
+  
+- [x] **Missing Data Loading Function**: Fixed in v0.5.2.4 **[SCRIPT]**
+  - Error: ImportError - cannot import 'load_and_process_data'
+  - Solution: Implemented load_and_process_data() in utils/io.py
+  
+- [x] **Column Capitalization**: Fixed in v0.5.2.4 **[SCRIPT]**
+  - Issue: CSV has capitalized columns, code expects lowercase
+  - Solution: Added column normalization in load_and_process_data()
+
+### Files Modified
+- `features/builder.py` - Fixed _compute_talib() for vectorbt 0.28.1
+- `utils/io.py` - Added load_and_process_data() with column normalization
+
+---
+
+## Infrastructure and Documentation Reorganization
+
+**Status**: COMPLETED  
+**Version**: 0.5.1.2  
+**Date**: 2025-08-19 to 2025-08-22  
+**Tags**: [INFRA] [DOC]
+
+### Summary
+Major project reorganization including notebook structure, documentation hierarchy, and infrastructure support for Thunder Compute and Modal GPU.
+
+### Tasks Completed
+- [x] **Project Reorganization**: Better maintainability structure **[INFRA]**
+- [x] **Thunder Compute MCP**: Documentation server integration **[DOC]**
+- [x] **GPU Migration Workflow**: Complete documentation **[DOC]**
+- [x] **Modal GPU Infrastructure**: Support and documentation **[INFRA]**
+- [x] **Thunder Compute Automation**: One-command deployment **[SCRIPT]**
+
+### Files Created/Modified
+- Multiple documentation files reorganized
+- Modal infrastructure configuration files
+- GPU migration workflow documentation
+- Thunder Compute setup automation scripts
 
 ---
 
@@ -376,399 +270,203 @@ After nf-validation-expert agent review, 4 critical issues were identified and r
 
 **Status**: COMPLETED  
 **Version**: 0.5.1  
-**Spec Location**: `docs/notebook_conversion_workflow.md`
+**Date**: 2025-08-19  
+**Spec Location**: `docs/notebook_conversion_workflow.md`  
+**Tags**: [SCRIPT] [DOC] [VALIDATION]
 
-### Task Completion
+### Summary
+Converted all Python scripts to Jupyter notebooks while maintaining 100% functionality.
 
-- [x] **Phase 1**: Script conversion (parallel execution) **[SCRIPT]** **[DOC]**
-  - Agent 1: Converted 3 training/test scripts to notebooks
-    - `run_train.py` → `run_train.ipynb` (15 cells: 10 code, 5 markdown)
-    - `test_cv_integration.py` → `test_cv_integration.ipynb` (11 cells: 6 code, 5 markdown)
-    - `test_feature_integration.py` → `test_feature_integration.ipynb` (9 cells: 4 code, 5 markdown)
-  - Agent 2: Converted prediction script to notebook
-    - `run_predict.py` → `run_predict.ipynb` (16 cells: 8 code, 8 markdown)
+### Tasks Completed
+- [x] **Script Conversion**: Convert all Python scripts to notebooks **[SCRIPT]**
+  - `run_train.py` → `run_train.ipynb` (15 cells)
+  - `test_cv_integration.py` → `test_cv_integration.ipynb` (11 cells)
+  - `test_feature_integration.py` → `test_feature_integration.ipynb` (9 cells)
+  - `run_predict.py` → `run_predict.ipynb` (16 cells)
   
-- [x] **Phase 2**: Validation (sequential execution) **[VALIDATION]**
-  - Integration-test-orchestrator validation report:
-    - All notebooks syntactically valid JSON format
-    - All original functions preserved without modification
-    - argparse successfully replaced with notebook variables
-    - Path configuration variables correctly defined
-    - NeuralForecast compliance verified
-    - Execution readiness confirmed
-  
+- [x] **Validation**: Ensure all notebooks are valid **[VALIDATION]**
+  - All notebooks syntactically valid
+  - All original functions preserved
+  - argparse replaced with notebook variables
+  - NeuralForecast compliance verified
+
 ### Files Created
-
 - `run_train.ipynb` - Training pipeline notebook
 - `run_predict.ipynb` - Prediction pipeline notebook
 - `test_cv_integration.ipynb` - CV testing notebook
 - `test_feature_integration.ipynb` - Feature testing notebook
-- `NOTEBOOK_VALIDATION_REPORT.md` - Comprehensive validation report
-
-### Key Features Implemented
-
-- Replaced argparse with notebook configuration cells
-- Added standardized path variables at notebook top
-- Organized code into logical cells with markdown headers
-- Preserved all original functionality without modification
-- Maintained NF-centric approach without custom implementations
-- Ensured all data validation gates preserved
+- `NOTEBOOK_VALIDATION_REPORT.md` - Validation report
 
 ---
 
-## Infrastructure and Documentation Updates
+## Cross-Validation and Metrics
 
 **Status**: COMPLETED  
-**Version**: 0.5.1.2  
-**Period**: 2025-08-19 to 2025-08-22
+**Version**: 0.5.0  
+**Date**: 2025-08-16  
+**Spec Location**: `.kiro/specs/cross-validation-metrics/`  
+**Tags**: [SCRIPT] [CONFIG] [VALIDATION] [DOC]
 
-### Major Reorganization and Infrastructure Updates
+### Summary
+Complete implementation of NF-native cross-validation with sCRPS metrics and calibration diagnostics. System achieved 100% acceptance validation.
 
-- [x] **Major reorganization** - notebooks, docs structure, and infrastructure updates **[INFRA]** **[DOC]**
-  - Reorganized project structure for better maintainability
-  - Restructured documentation hierarchy
-  - Updated infrastructure configurations
-  - Enhanced project organization patterns
-  
-- [x] **Thunder Compute MCP documentation server** **[INFRA]** **[DOC]**
-  - Added Thunder Compute Model Context Protocol (MCP) server
-  - Created documentation server for Thunder Compute integration
-  - Enabled better integration with compute infrastructure
-  
-- [x] **GPU migration workflow and session handoff documentation** **[DOC]** **[INFRA]**
-  - Created comprehensive GPU migration documentation
-  - Documented session handoff procedures
-  - Added workflow guides for GPU resource management
-  
-- [x] **Modal GPU infrastructure and reorganize documentation** **[INFRA]** **[DOC]**
-  - Integrated Modal GPU infrastructure support
-  - Created Modal-specific deployment configurations
-  - Reorganized documentation to support multiple GPU providers
-  - Added Modal serverless GPU orchestration patterns
-  
-- [x] **Reorganize Modal documentation structure** **[DOC]**
-  - Restructured Modal-specific documentation
-  - Created hierarchical documentation for Modal workflows
-  - Improved navigation and discoverability
-  
-- [x] **Thunder Compute setup automation** **[INFRA]** **[SCRIPT]**
-  - Created `setup.sh`: Automated setup script for Thunder Compute A100XL instances
-    - Python 3.13 installation and configuration
-    - CUDA 12.2 and NVIDIA driver 535 installation
-    - TA-Lib C library compilation and installation
-    - Complete Python dependency management in critical order
-  - Created `THUNDER_SETUP_GUIDE.md`: Quick setup guide for deployment
-    - Step-by-step deployment workflow
-    - GPU verification procedures
-    - Training startup instructions
-  - Added `.kiro/specs/thunder-compute-setup/`: Specification documents
-    - `design.md`: Architecture and design decisions
-    - `requirements.md`: System requirements and dependencies
-    - `tasks.md`: Implementation task breakdown
-  - Enables one-command deployment on fresh Thunder Compute instances
+### Major Components
+- NF-native cross_validation with proper windowing
+- sCRPS as primary metric with supporting metrics
+- Coverage and PIT calibration diagnostics
+- Model selection and persistence system
+- Risk mitigation and error recovery protocols
+- Comprehensive test suite (75+ tests)
 
 ### Files Created/Modified
-
-- `setup.sh` - Thunder Compute automated setup script
-- `THUNDER_SETUP_GUIDE.md` - Quick deployment guide
-- `.kiro/specs/thunder-compute-setup/design.md` - Architecture specification
-- `.kiro/specs/thunder-compute-setup/requirements.md` - Requirements specification
-- `.kiro/specs/thunder-compute-setup/tasks.md` - Task breakdown
-- Multiple documentation files reorganized and updated
-- Modal infrastructure configuration files
-- GPU migration workflow documentation
+- `cv/runner.py` - Core CV execution (850+ lines)
+- `uq/metrics.py` - Metrics computation (600+ lines)
+- `uq/calibration.py` - Calibration diagnostics (700+ lines)
+- `utils/error_recovery.py` - Error handling (500+ lines)
+- `utils/risk_mitigation.py` - Risk prevention (400+ lines)
+- `tests/test_cv.py` - Unit tests (1100+ lines)
+- `tests/test_cv_integration.py` - Integration tests (1200+ lines)
+- 5 example notebooks in `examples/cv/`
 
 ---
 
-## Thunder Compute Setup Spec
+## NeuralForecast Model Factory
 
 **Status**: COMPLETED  
-**Version**: 0.5.1.3  
-**Spec Location**: `.kiro/specs/thunder-compute-setup/`
+**Version**: 0.4.1  
+**Date**: 2025-08-15  
+**Spec Location**: `.kiro/specs/neuralforecast-model-factory/`  
+**Tags**: [SCRIPT] [CONFIG] [VALIDATION] [DOC]
 
-### Task Completion
+### Summary
+Complete model factory implementation for 4 models × 3 losses × 4 horizons with Jupyter notebook integration.
 
-- [x] **Task 1**: Create Thunder Compute setup script **[SCRIPT]** **[INFRA]**
-  - `setup.sh`: Complete automated setup script optimized for Thunder Compute A100XL
-    - Pre-installed software detection (CUDA 12.9, PyTorch 2.7.1, JupyterLab)
-    - System packages installation (build tools, development libraries)
-    - Python 3.13.6 installation from deadsnakes PPA
-    - Node.js LTS and Claude Code installation for AI-assisted development
-    - TA-Lib C library installation (apt or compile from source)
-    - Virtual environment creation and dependency management
-    - PyTorch upgrade from 2.7.1 to 2.8.0 for CUDA 12.9 compatibility
-    - Repository cloning and project structure creation
-    - Comprehensive validation and GPU testing
-    - Dry-run mode for safe testing
+### Major Components
+- Model instantiation for NHITS, NBEATSx, TiDE, PatchTST
+- Loss functions: DistributionLoss("StudentT"), MQLoss, IQLoss
+- Horizon configs: h4, h8, h16, h32
+- Performance profiling and memory optimization
+- Comprehensive testing and documentation
 
-- [x] **Task 2**: Create practical training guide **[DOC]**
-  - `TRAINING_GUIDE.md`: Complete A100XL training guide updated for pre-installed environment
-    - Pre-installed software section documenting CUDA 12.9, PyTorch 2.7.1, JupyterLab
-    - Optimal batch sizes for 80GB VRAM (512 default, 256 fallback)
-    - A100XL-specific memory configurations and environment variables
-    - Training performance estimates and expected times
-    - GPU monitoring commands (nvidia-smi, gpustat, watch)
-    - Comprehensive troubleshooting section for common issues
-    - Performance optimization tips and memory management
-    - Configuration file examples and workflow guidance
-
-- [x] **Task 3**: Create cleanup and utility scripts **[SCRIPT]** **[INFRA]**
-  - `cleanup.sh`: Multi-mode cleanup script for failed installations
-    - Virtual environment cleanup
-    - Python package cleanup
-    - CUDA compatibility reset (no driver removal needed)
-    - Fresh start capability with multiple cleanup modes
-  - Docker testing integration with `test_setup_docker.sh`
-  - Validation and testing utilities compatible with pre-installed software
+### Critical Issues Fixed (v0.4.1)
+1. PatchTST exogenous variable incompatibility resolved
+2. DistributionLoss missing return_params=True fixed
+3. Missing imports in documentation notebooks added
+4. Simulated metrics replaced with real calculations
 
 ### Files Created/Modified
-
-- `setup.sh` - Thunder Compute automated setup script (optimized for pre-installed software)
-- `TRAINING_GUIDE.md` - A100XL training guide (updated for pre-installed environment)
-- `THUNDER_SETUP_GUIDE.md` - Quick setup guide (removed CUDA installation steps)
-- `dependencies.yaml` - Updated with pre-installed software compatibility notes
-- `cleanup.sh` - Multi-mode cleanup script
-- `test_setup_docker.sh` - Docker container testing script
-- `.kiro/specs/thunder-compute-setup/requirements.md` - Requirements specification
-- `.kiro/specs/thunder-compute-setup/design.md` - Architecture and design decisions
-- `.kiro/specs/thunder-compute-setup/tasks.md` - Implementation task breakdown
-
-### Key Updates for Pre-installed Software **[INFRA]**
-
-- **CUDA 12.9 Compatibility**: No CUDA installation, compatibility checks only
-- **PyTorch Upgrade**: From pre-installed 2.7.1 to 2.8.0 for better CUDA 12.9 support
-- **JupyterLab Integration**: Uses pre-installed JupyterLab, no installation needed
-- **Docker Support**: Leverages pre-installed Docker for containerized testing
-- **Scientific Libraries**: Compatible with pre-installed NumPy, Pandas, etc.
-- **No Reboot Required**: Removed driver installation eliminates reboot requirement
-- **Streamlined Setup**: Reduced setup time by leveraging pre-installed components
+- `nf_models/factory.py` - Model instantiation system (905 lines)
+- `nf_models/01-04_*.ipynb` - 4 comprehensive notebooks
+- `experiments/h{4,8,16,32}.yaml` - Horizon configurations
 
 ---
 
-## Changelog
+## Feature Engineering Pipeline
+
+**Status**: COMPLETED  
+**Version**: 0.3.0  
+**Date**: 2025-08-15  
+**Spec Location**: `.kiro/specs/feature-engineering-pipeline/`  
+**Tags**: [SCRIPT] [CONFIG] [VALIDATION] [ANALYSIS]
+
+### Summary
+Complete feature engineering with 13 indicators, MTF support, and strict leakage prevention.
+
+### Major Components
+- 13 technical indicators via vectorbt/TA-Lib
+- Multi-timeframe (30min, 1h, 4h) feature alignment
+- Strict shift(1) for leakage prevention
+- Feature selection with ≤256 cap
+- Comprehensive test coverage
+
+### Files Created/Modified
+- `features/registry.py` - Indicator specifications
+- `features/builder.py` - Complete pipeline (8 functions)
+- `tests/test_features.py` - Core tests
+- `tests/test_hygiene.py` - Hygiene tests
+
+---
+
+## Data Processing and Validation
+
+**Status**: COMPLETED  
+**Version**: 0.1.0  
+**Date**: 2025-08-15  
+**Spec Location**: `.kiro/specs/data-processing-validation/`  
+**Tags**: [SCRIPT] [VALIDATION]
+
+### Summary
+Foundation data pipeline from 1-minute to 15-minute bars with complete validation.
+
+### Major Components
+- 1-min to 15-min OHLCV aggregation
+- UTC EOB timestamp handling
+- NF canonical frame creation
+- Validation utilities (4 assertions)
+- Processing 7.16M → 477K bars
+
+### Files Created/Modified
+- `utils/io.py` - Data I/O and processing (7 functions)
+- `utils/validate.py` - Validation suite (4 functions)
+- `run_train.py` - Training pipeline entry point
+
+---
+
+## Version History
+
+### [0.5.2.11] - 2025-08-27
+Complete CircleCI foundation setup with GPU support, validation jobs, and comprehensive caching
+
+### [0.5.2.6] - 2025-08-26
+CircleCI Foundation Setup Task 2 - Comprehensive dependency management and caching system
+
+### [0.5.2.5] - 2025-08-26
+CircleCI Foundation Setup Task 1 - Base configuration structure
 
 ### [0.5.2.4] - 2025-08-24
-- **Data Pipeline Issues Fully Resolved**
-- Fixed missing load_and_process_data() function in utils/io.py
-- Added column name normalization to handle CSV capitalization (Timestamp → timestamp)
-- Integrated complete data processing pipeline: load → normalize → aggregate → canonicalize
-- Fixed ImportError in run_train.ipynb that prevented training execution
-- Tested full data loading pipeline with 477K 15-minute bars from 7.16M raw records
-- All data pipeline blocking issues resolved, ready for GPU training
+Data pipeline issues fully resolved, ready for GPU training
 
 ### [0.5.2.3] - 2025-08-24
-- **Partial Fix for vectorbt API Compatibility**
-- Fixed AttributeError in features/builder.py where RSI object lacked '_results' attribute
-- Modified _compute_talib() to use output_names and getattr() for indicator access
-- Identified but not fixed: missing load_and_process_data() function
-- Identified but not fixed: column name capitalization issues
+Partial fix for vectorbt API compatibility
 
 ### [0.5.2.2] - 2025-08-22
-- **Critical Configuration Fixes and Robustness Improvements**
-- Fixed val_size configuration in all YAML files to follow 4*h rule (h4=16, h8=32, h16=64, h32=128)
-- Added comprehensive checkpointing functionality to cv/runner.py for long training runs
-- Enhanced kaggle_download_btc.py with data integrity verification (file size, row count, columns)
-- Added kagglehub to requirements.txt and setup.sh for data downloading
-- Updated TRAINING_GUIDE.md with checkpointing instructions and data verification
-- Documented val_size auto-correction behavior in notebooks
-- All changes improve system robustness for expensive GPU training sessions
+Critical configuration fixes and robustness improvements
 
 ### [0.5.2.1] - 2025-01-22
-- Analyzed and documented file usage across all project directories
-- Identified which files are actively used vs development tools in the training pipeline
+File usage analysis and documentation
 
 ### [0.5.2.0] - 2025-08-22
-- **Training Guide Foundation Workflow Update - COMPLETED**
-- Completed training-guide-vscode-optimization spec (1/1 tasks)
-- Updated docs/workflows/TRAINING_GUIDE.md with foundation workflow (Specs 1-4)
-- Replaced existing guide with notebook-focused sequential workflow
-- Documented 3-step process: setup.sh → kaggle_download_btc.py → run_train.ipynb
-- Added cell-by-cell execution guidance with expected outputs
-- Included A100XL-specific optimizations and comprehensive troubleshooting
-- Added local pre-GPU validation framework to minimize GPU debugging time
-- Focus on foundation capability with basic forecasting/prediction
-- Training guide optimization specification complete
+Training guide foundation workflow update
 
 ### [0.5.1.3] - 2025-08-22
-
-- **Thunder Compute Pre-installed Software Compatibility Update**
-- Updated all setup scripts and documentation for Thunder Compute's pre-installed software
-- Modified setup.sh to work with CUDA 12.9, PyTorch 2.7.1, JupyterLab, Docker pre-installed
-- Updated TRAINING_GUIDE.md to reflect pre-installed environment and remove driver installation
-- Updated dependencies.yaml with pre-installed software section and compatibility notes
-- Updated THUNDER_SETUP_GUIDE.md to remove CUDA installation and reboot requirements
-- Completed Thunder Compute setup specification (3/3 tasks)
+Thunder Compute pre-installed software compatibility
 
 ### [0.5.1.2] - 2025-08-22
-
-- Added Thunder Compute setup automation with one-command deployment
-- Created automated setup script for A100XL instances with Python 3.13, CUDA, and dependencies
-- Integrated Modal GPU infrastructure for serverless GPU orchestration
-- Reorganized documentation structure for better maintainability
-- Added Thunder Compute MCP documentation server
-- Created GPU migration workflow and session handoff documentation
-- Restructured Modal documentation with hierarchical organization
-- Enhanced infrastructure configurations for multiple GPU providers
+Infrastructure and Modal GPU integration
 
 ### [0.5.1] - 2025-08-19
-
-- Completed notebook conversion workflow (4/4 notebooks)
-- Converted all Python scripts to Jupyter notebooks
-- Maintained 100% functionality preservation
-- Added comprehensive validation report
-- All notebooks production-ready with proper structure
+Notebook conversion workflow completed
 
 ### [0.5.0] - 2025-08-16
-
-- Completed Cross-Validation and Metrics specification (20/20 tasks)
-- Implemented NF-native cross-validation with sCRPS as primary metric
-- Added comprehensive coverage and PIT calibration diagnostics
-- Integrated conformal prediction using NF's PredictionIntervals
-- Created complete model selection and persistence system
-- Enhanced training pipeline with full CV integration
-- Added comprehensive test suite (75+ tests with >90% coverage)
-- Implemented risk mitigation and error recovery protocols
-- Created complete documentation with 5 example notebooks
-- Achieved 100% acceptance validation (80/80 criteria passed)
-- System approved for production deployment
+Cross-validation and metrics system complete
 
 ### [0.4.1] - 2025-08-15
-
-- Fixed 4 critical issues identified by nf-validation-expert agents
-- Resolved PatchTST exogenous support incompatibility
-- Added missing return_params=True to DistributionLoss
-- Fixed missing imports (sCRPS, PredictionIntervals) in documentation
-- Replaced simulated metrics with real calculations in acceptance criteria
+Critical NF model factory issues fixed
 
 ### [0.4.0] - 2025-08-15
-
-- Completed NeuralForecast model factory specification (Tasks 11-16)
-- Converted implementation to Jupyter notebooks for Mac M4 Pro development
-- Added comprehensive integration tests, performance profiling, and documentation
-- Validated all acceptance criteria from Section 12
-- System ready for A100 production deployment
+NeuralForecast model factory completed
 
 ### [0.3.0] - 2025-08-15
+Feature engineering pipeline completed
 
-- Completed feature engineering pipeline: integration, testing, validation (Tasks 6-8)
-
-### [0.2.0] - 2025-08-15  
-
-- Added feature engineering pipeline: registry, computation, MTF, selection (Tasks 1-5)
+### [0.2.0] - 2025-08-15
+Feature engineering initial implementation
 
 ### [0.1.5] - 2025-08-15
-
-- Added NeuralForecast model factory with 4 models and 3 loss types (Tasks 1-10)
+NeuralForecast model factory initial
 
 ### [0.1.0] - 2025-08-15
-
-- Completed data processing validation pipeline with all utilities and tests
+Data processing validation completed
 
 ### [0.0.0] - Initial
-
-- Project initialization and planning phase
-
----
-
-## Training Guide VSCode Optimization Spec
-**Status**: COMPLETED  
-**Version**: 0.5.2.0  
-**Spec Location**: `.kiro/specs/training-guide-vscode-optimization/`
-
-### Task Completion
-
-- [x] **Task 1**: Update TRAINING_GUIDE.md with Foundation Workflow (Specs 1-4 Only) **[DOC]**
-  - `docs/workflows/TRAINING_GUIDE.md`: Complete rewrite focusing on foundation workflow
-    - Replaced existing guide with notebook-focused sequential workflow
-    - Documented 3-step process: setup.sh → kaggle_download_btc.py → run_train.ipynb
-    - Added cell-by-cell execution guidance for run_train.ipynb with expected outputs
-    - Documented horizon selection (h4/h8/h16/h32) using existing YAML configurations
-    - Included A100XL-specific optimizations and batch sizes (512 for most models, 256 for PatchTST)
-    - Added GPU monitoring commands (nvidia-smi, gpustat) and progress indicators
-    - Documented artifact locations: experiments/h{horizon}/ structure with cv_results, metrics, leaderboard
-    - Explained sCRPS scores interpretation (lower is better, <0.12 good), coverage metrics (±2% tolerance)
-    - Comprehensive troubleshooting for common error scenarios (CUDA OOM, import errors, data validation failures)
-    - Added local pre-GPU validation framework to minimize GPU debugging time
-    - Focus on foundation capability with Specs 1-4 implementation, noted additional specs (5-14) for later
-    - All paths relative to workspace root for consistency
-
-### Files Created/Modified
-- `docs/workflows/TRAINING_GUIDE.md` - Complete foundation workflow guide (replaced existing)
-- `.kiro/specs/training-guide-vscode-optimization/requirements.md` - Requirements specification
-- `.kiro/specs/training-guide-vscode-optimization/design.md` - Architecture and design decisions
-- `.kiro/specs/training-guide-vscode-optimization/tasks.md` - Implementation task breakdown
-
-### Key Features Implemented
-- **Sequential 3-step workflow** for autonomous training execution
-- **Cell-by-cell notebook guidance** with expected outputs for each execution step
-- **A100XL optimization** with tested batch sizes and memory settings
-- **Comprehensive error recovery** procedures for common failure modes
-- **Local validation framework** to catch preventable issues before GPU deployment
-- **Clear artifact interpretation** for sCRPS scores, coverage metrics, and leaderboard format
-- **Foundation focus** clearly noting Specs 1-4 coverage with basic forecasting capability
-
-### Success Criteria Met
-- ✅ Complete sequential workflow from setup to results with no gaps
-- ✅ Local validation framework to predict GPU environment behavior
-- ✅ All procedures documented against existing system (v0.5.1.2)
-- ✅ Comprehensive troubleshooting for common failure modes
-- ✅ Clear, actionable documentation enabling autonomous training execution
-
----
-
-## Debugging & Issues
-
-### Issue #1: vectorbt API Compatibility & Data Pipeline Issues
-**Date**: 2025-08-24  
-**Status**: RESOLVED  
-**Version**: 0.5.2.4  
-**Tags**: [DEPENDENCY] [SCRIPT] [VALIDATION]
-
-#### Complete Resolution Summary
-
-##### 1. vectorbt API Compatibility (Fixed in v0.5.2.3)
-- **Error**: AttributeError - RSI object has no attribute '_results'
-- **Location**: features/builder.py line 22 in _compute_talib()
-- **Solution**: Modified function to use output_names and getattr() instead of _results
-- **Commit**: f7bafeb on instance-training-v0.5.2.X branch
-
-##### 2. Missing Data Loading Function (Fixed in v0.5.2.4)
-- **Error**: ImportError - cannot import name 'load_and_process_data' from 'utils.io'
-- **Location**: run_train.ipynb Cell [10] expected this function
-- **Solution**: Implemented load_and_process_data() in utils/io.py
-- **Commit**: 5774d92 on instance-training-v0.5.2.X branch
-
-##### 3. Column Name Capitalization (Fixed in v0.5.2.4)
-- **Issue**: CSV has [Timestamp, Open, High, Low, Close, Volume] but code expects lowercase
-- **Solution**: Added column normalization in load_and_process_data()
-- **Implementation**: df.columns = df.columns.str.lower() handles all cases
-
-#### Full Pipeline Status
-- ✅ Data loading: 477,464 rows processed from 7.16M raw records
-- ✅ Column normalization: Capitalized → lowercase → NF schema
-- ✅ 15-minute aggregation: Proper OHLCV aggregation rules applied
-- ✅ NF canonical format: unique_id, ds, y (log returns), OHLCV columns
-- ✅ Ready for GPU training: All blocking issues resolved
-
-#### Environment Setup Completed (via setup.sh)
-All dependencies from setup.sh were successfully installed:
-- **Core**: numpy==2.3.2, pandas==2.3.1, pyarrow==20.0.0, kagglehub
-- **ML Framework**: torch==2.8.0, pytorch-lightning==2.5.3, neuralforecast==3.0.2
-- **Statistical**: scikit-learn==1.7.1, statsmodels==0.14.5
-- **Technical Indicators**: 
-  - TA-Lib==0.6.5 (Python wrapper, C library pre-installed)
-  - vectorbt==0.28.0
-  - pandas-ta-openbb==0.4.22
-  - technical==1.4.0
-- **Trading**: freqtrade==2025.7
-
-#### Files Modified
-- features/builder.py: Fixed _compute_talib() function for vectorbt 0.28.1 compatibility
-
-#### Next Steps Required
-1. Implement load_and_process_data() in utils/io.py OR update notebook to use existing functions
-2. Handle column name capitalization issue
-3. Complete full pipeline integration testing
-4. Verify notebook execution end-to-end
-
-**Issue remains OPEN for complete resolution**
+Project initialization and planning phase

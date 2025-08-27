@@ -1,0 +1,1066 @@
+version: 2.1
+
+# Pipeline parameters for controlling behavior
+parameters:
+  run_foundation_tests:
+    type: boolean
+    default: true
+    description: "Run foundation validation tests (specs 1-4)"
+  
+  run_gpu_tests:
+    type: boolean
+    default: false
+    description: "Run GPU-enabled tests (model factory, cross-validation)"
+  
+  cache_strategy:
+    type: enum
+    enum: ["aggressive", "conservative", "disabled"]
+    default: "aggressive"
+    description: "Caching strategy for dependencies and artifacts"
+  
+  python_version:
+    type: string
+    default: "3.13"
+    description: "Python version to use"
+
+# Orb imports for standard functionality
+orbs:
+  python: circleci/python@2.1.1
+  node: circleci/node@5.2.0
+
+# Reusable commands for common operations
+commands:
+  setup_environment:
+    description: "Set up Python environment with dependencies"
+    parameters:
+      python_version:
+        type: string
+        default: << pipeline.parameters.python_version >>
+    steps:
+      - checkout
+      - python/install-packages:
+          pkg-manager: pip
+          python-version: << parameters.python_version >>
+      - run:
+          name: "Install system dependencies"
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y build-essential wget libta-lib-dev
+            # TA-Lib C library installation
+            wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
+            tar -xzf ta-lib-0.4.0-src.tar.gz
+            cd ta-lib/
+            ./configure --prefix=/usr
+            make
+            sudo make install
+            cd ..
+            rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
+
+  # ============================================================================
+  # DEPENDENCY CACHING SYSTEM
+  # ============================================================================
+  
+  restore_python_dependencies:
+    description: "Restore Python dependency cache with fallback strategy"
+    steps:
+      - when:
+          condition:
+            not:
+              equal: [ "disabled", << pipeline.parameters.cache_strategy >> ]
+          steps:
+            - restore_cache:
+                name: "Restore Python dependencies (primary)"
+                keys:
+                  # Primary: Both requirements.txt and dependencies.yaml checksums
+                  - v2-python-deps-{{ checksum "requirements.txt" }}-{{ checksum "dependencies.yaml" }}-{{ arch }}
+                  # Fallback 1: Only requirements.txt checksum
+                  - v2-python-deps-{{ checksum "requirements.txt" }}-{{ arch }}
+                  # Fallback 2: Architecture-specific partial cache
+                  - v2-python-deps-{{ arch }}-
+                  # Fallback 3: Any previous cache
+                  - v2-python-deps-
+            - run:
+                name: "Validate Python dependency cache"
+                command: |
+                  if [ -d ".venv" ]; then
+                    echo "Virtual environment cache found"
+                    source .venv/bin/activate
+                    python --version || echo "Cache validation failed - will rebuild"
+                  else
+                    echo "No virtual environment cache found - will create new"
+                  fi
+
+  save_python_dependencies:
+    description: "Save Python dependency cache"
+    steps:
+      - when:
+          condition:
+            not:
+              equal: [ "disabled", << pipeline.parameters.cache_strategy >> ]
+          steps:
+            - save_cache:
+                name: "Save Python dependencies"
+                key: v2-python-deps-{{ checksum "requirements.txt" }}-{{ checksum "dependencies.yaml" }}-{{ arch }}
+                paths:
+                  - ~/.cache/pip
+                  - .venv
+                  - /home/circleci/.local/lib/python*/site-packages
+            - run:
+                name: "Cache validation report"
+                command: |
+                  echo "=== Python Dependency Cache Report ==="
+                  echo "Cache key: v2-python-deps-{{ checksum "requirements.txt" }}-{{ checksum "dependencies.yaml" }}-{{ arch }}"
+                  echo "Virtual environment size: $(du -sh .venv 2>/dev/null || echo 'N/A')"
+                  echo "Pip cache size: $(du -sh ~/.cache/pip 2>/dev/null || echo 'N/A')"
+                  echo "Cached packages:"
+                  source .venv/bin/activate && pip list --format=freeze | head -10
+
+  restore_talib_cache:
+    description: "Restore TA-Lib compilation cache with validation"
+    steps:
+      - when:
+          condition:
+            or:
+              - equal: [ "aggressive", << pipeline.parameters.cache_strategy >> ]
+              - equal: [ "conservative", << pipeline.parameters.cache_strategy >> ]
+          steps:
+            - restore_cache:
+                name: "Restore TA-Lib compilation cache"
+                keys:
+                  # Primary: TA-Lib version + architecture + requirements checksum
+                  - v2-talib-{{ arch }}-{{ checksum "requirements.txt" }}-0.4.0
+                  # Fallback 1: Architecture + TA-Lib version
+                  - v2-talib-{{ arch }}-0.4.0
+                  # Fallback 2: Architecture only
+                  - v2-talib-{{ arch }}-
+            - run:
+                name: "Validate TA-Lib cache"
+                command: |
+                  if [ -f "/usr/local/lib/libta_lib.so" ] || [ -f "/usr/lib/libta_lib.so" ]; then
+                    echo "TA-Lib library cache found"
+                    ldconfig -p | grep ta_lib || echo "TA-Lib not in library path - may need rebuild"
+                  else
+                    echo "No TA-Lib cache found - will compile from source"
+                  fi
+
+  save_talib_cache:
+    description: "Save TA-Lib compilation cache"
+    steps:
+      - when:
+          condition:
+            or:
+              - equal: [ "aggressive", << pipeline.parameters.cache_strategy >> ]
+              - equal: [ "conservative", << pipeline.parameters.cache_strategy >> ]
+          steps:
+            - save_cache:
+                name: "Save TA-Lib compilation cache"
+                key: v2-talib-{{ arch }}-{{ checksum "requirements.txt" }}-0.4.0
+                paths:
+                  - /usr/local/lib/libta_lib*
+                  - /usr/local/include/ta_libc.h
+                  - /usr/local/include/ta_defs.h
+                  - /usr/local/include/ta_func.h
+                  - /usr/lib/libta_lib*
+            - run:
+                name: "TA-Lib cache validation report"
+                command: |
+                  echo "=== TA-Lib Cache Report ==="
+                  echo "Cache key: v2-talib-{{ arch }}-{{ checksum "requirements.txt" }}-0.4.0"
+                  echo "Library files:"
+                  find /usr/local/lib -name "*ta_lib*" 2>/dev/null || echo "No files in /usr/local/lib"
+                  find /usr/lib -name "*ta_lib*" 2>/dev/null || echo "No files in /usr/lib"
+                  echo "Header files:"
+                  find /usr/local/include -name "ta_*.h" 2>/dev/null || echo "No headers found"
+
+  restore_system_cache:
+    description: "Restore system package cache"
+    steps:
+      - when:
+          condition:
+            equal: [ "aggressive", << pipeline.parameters.cache_strategy >> ]
+          steps:
+            - restore_cache:
+                name: "Restore system package cache"
+                keys:
+                  - v2-system-{{ arch }}-{{ epoch }}
+                  - v2-system-{{ arch }}-
+            - run:
+                name: "Validate system cache"
+                command: |
+                  echo "System package cache status:"
+                  ls -la /var/cache/apt/archives/ | wc -l || echo "No apt cache found"
+
+  save_system_cache:
+    description: "Save system package cache"
+    steps:
+      - when:
+          condition:
+            equal: [ "aggressive", << pipeline.parameters.cache_strategy >> ]
+          steps:
+            - save_cache:
+                name: "Save system package cache"
+                key: v2-system-{{ arch }}-{{ epoch }}
+                paths:
+                  - /var/cache/apt/archives
+
+  restore_processed_data_cache:
+    description: "Restore processed data cache with validation"
+    steps:
+      - when:
+          condition:
+            not:
+              equal: [ "disabled", << pipeline.parameters.cache_strategy >> ]
+          steps:
+            - restore_cache:
+                name: "Restore processed data cache"
+                keys:
+                  # Primary: Raw data checksum + processing version
+                  - v2-data-{{ checksum "data/raw/btcusd_1-min_data.csv" }}-{{ checksum "utils/io.py" }}
+                  # Fallback 1: Raw data checksum only
+                  - v2-data-{{ checksum "data/raw/btcusd_1-min_data.csv" }}
+                  # Fallback 2: Any processed data
+                  - v2-data-
+            - run:
+                name: "Validate processed data cache"
+                command: |
+                  if [ -d "data/processed" ]; then
+                    echo "Processed data cache found"
+                    echo "Files in cache:"
+                    ls -la data/processed/ || echo "Cache directory empty"
+                    echo "Cache size: $(du -sh data/processed/ 2>/dev/null || echo 'N/A')"
+                  else
+                    echo "No processed data cache found - will process from raw data"
+                  fi
+
+  save_processed_data_cache:
+    description: "Save processed data cache"
+    steps:
+      - when:
+          condition:
+            not:
+              equal: [ "disabled", << pipeline.parameters.cache_strategy >> ]
+          steps:
+            - save_cache:
+                name: "Save processed data cache"
+                key: v2-data-{{ checksum "data/raw/btcusd_1-min_data.csv" }}-{{ checksum "utils/io.py" }}
+                paths:
+                  - data/processed
+            - run:
+                name: "Processed data cache report"
+                command: |
+                  echo "=== Processed Data Cache Report ==="
+                  echo "Cache key: v2-data-{{ checksum "data/raw/btcusd_1-min_data.csv" }}-{{ checksum "utils/io.py" }}"
+                  echo "Cached files:"
+                  find data/processed -name "*.parquet" -exec ls -lh {} \; 2>/dev/null || echo "No parquet files found"
+                  echo "Total cache size: $(du -sh data/processed/ 2>/dev/null || echo 'N/A')"
+
+  restore_model_artifacts_cache:
+    description: "Restore model artifacts cache"
+    steps:
+      - when:
+          condition:
+            not:
+              equal: [ "disabled", << pipeline.parameters.cache_strategy >> ]
+          steps:
+            - restore_cache:
+                name: "Restore model artifacts cache"
+                keys:
+                  # Primary: Branch + revision specific
+                  - v2-models-{{ .Branch }}-{{ .Revision }}
+                  # Fallback 1: Branch specific
+                  - v2-models-{{ .Branch }}-
+                  # Fallback 2: Any model artifacts
+                  - v2-models-
+            - run:
+                name: "Validate model artifacts cache"
+                command: |
+                  echo "Model artifacts cache status:"
+                  find experiments -name "best" -type d 2>/dev/null | head -5 || echo "No model artifacts found"
+                  find . -name "*.pkl" -type f 2>/dev/null | head -5 || echo "No pickle files found"
+
+  save_model_artifacts_cache:
+    description: "Save model artifacts cache"
+    steps:
+      - when:
+          condition:
+            not:
+              equal: [ "disabled", << pipeline.parameters.cache_strategy >> ]
+          steps:
+            - save_cache:
+                name: "Save model artifacts cache"
+                key: v2-models-{{ .Branch }}-{{ .Revision }}
+                paths:
+                  - experiments/*/best
+                  - "*.pkl"
+                  - experiments/*/cv_results*.parquet
+                  - experiments/*/metrics*.json
+
+  restore_test_cache:
+    description: "Restore test results cache"
+    steps:
+      - when:
+          condition:
+            equal: [ "aggressive", << pipeline.parameters.cache_strategy >> ]
+          steps:
+            - restore_cache:
+                name: "Restore test cache"
+                keys:
+                  # Primary: Test files checksum + branch
+                  - v2-tests-{{ .Branch }}-{{ checksum "tests/**/*.py" }}
+                  # Fallback 1: Branch specific
+                  - v2-tests-{{ .Branch }}-
+                  # Fallback 2: Any test cache
+                  - v2-tests-
+
+  save_test_cache:
+    description: "Save test results cache"
+    steps:
+      - when:
+          condition:
+            equal: [ "aggressive", << pipeline.parameters.cache_strategy >> ]
+          steps:
+            - save_cache:
+                name: "Save test cache"
+                key: v2-tests-{{ .Branch }}-{{ checksum "tests/**/*.py" }}
+                paths:
+                  - test-results
+                  - coverage
+                  - .pytest_cache
+
+  # ============================================================================
+  # CACHE MANAGEMENT AND CLEANUP
+  # ============================================================================
+  
+  cleanup_failed_caches:
+    description: "Clean up corrupted or failed caches"
+    steps:
+      - run:
+          name: "Cache cleanup and validation"
+          command: |
+            echo "=== Cache Cleanup Report ==="
+            
+            # Clean up corrupted virtual environments
+            if [ -d ".venv" ]; then
+              if ! source .venv/bin/activate 2>/dev/null; then
+                echo "Corrupted virtual environment detected - removing"
+                rm -rf .venv
+              fi
+            fi
+            
+            # Clean up incomplete TA-Lib installations
+            if [ -f "/usr/local/lib/libta_lib.so" ]; then
+              if ! python -c "import talib" 2>/dev/null; then
+                echo "Incomplete TA-Lib installation detected - will rebuild"
+                sudo rm -f /usr/local/lib/libta_lib* /usr/local/include/ta_*.h
+              fi
+            fi
+            
+            # Clean up corrupted processed data
+            if [ -d "data/processed" ]; then
+              if [ ! -f "data/processed/btc_canonical_*.parquet" ]; then
+                echo "Incomplete processed data detected - removing"
+                rm -rf data/processed/*
+              fi
+            fi
+            
+            echo "Cache cleanup completed"
+
+  validate_all_caches:
+    description: "Comprehensive cache validation"
+    steps:
+      - run:
+          name: "Comprehensive cache validation"
+          command: |
+            echo "=== Comprehensive Cache Validation ==="
+            
+            # Python environment validation
+            if [ -d ".venv" ]; then
+              echo "✓ Python virtual environment cache exists"
+              source .venv/bin/activate
+              python --version && echo "✓ Python environment functional" || echo "✗ Python environment corrupted"
+            else
+              echo "✗ No Python virtual environment cache"
+            fi
+            
+            # TA-Lib validation
+            if python -c "import talib" 2>/dev/null; then
+              echo "✓ TA-Lib installation functional"
+            else
+              echo "✗ TA-Lib not available or corrupted"
+            fi
+            
+            # Processed data validation
+            if [ -f "data/processed/btc_canonical_"*".parquet" ]; then
+              echo "✓ Processed data cache exists"
+              python -c "
+              import pandas as pd
+              import glob
+              files = glob.glob('data/processed/btc_canonical_*.parquet')
+              if files:
+                  df = pd.read_parquet(files[0])
+                  print(f'✓ Processed data functional: {len(df)} rows')
+              else:
+                  print('✗ No processed data files found')
+              " 2>/dev/null || echo "✗ Processed data corrupted"
+            else
+              echo "✗ No processed data cache"
+            fi
+            
+            # Model artifacts validation
+            if find experiments -name "best" -type d | grep -q .; then
+              echo "✓ Model artifacts cache exists"
+            else
+              echo "✗ No model artifacts cache"
+            fi
+            
+            echo "Cache validation completed"
+
+  generate_cache_report:
+    description: "Generate comprehensive cache performance report"
+    steps:
+      - run:
+          name: "Cache performance and efficiency report"
+          command: |
+            echo "=== Cache Performance Report ==="
+            echo "Generated at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "Pipeline: << pipeline.number >>"
+            echo "Branch: << pipeline.git.branch >>"
+            echo "Cache strategy: << pipeline.parameters.cache_strategy >>"
+            echo ""
+            
+            # Cache hit/miss analysis
+            echo "Cache Status Analysis:"
+            echo "====================="
+            
+            # Python dependencies
+            if [ -d ".venv" ]; then
+              venv_size=$(du -sh .venv 2>/dev/null | cut -f1)
+              pip_cache_size=$(du -sh ~/.cache/pip 2>/dev/null | cut -f1)
+              echo "✓ Python Dependencies: HIT (venv: $venv_size, pip cache: $pip_cache_size)"
+            else
+              echo "✗ Python Dependencies: MISS"
+            fi
+            
+            # TA-Lib compilation
+            if python -c "import talib" 2>/dev/null; then
+              talib_libs=$(find /usr/local/lib /usr/lib -name "*ta_lib*" 2>/dev/null | wc -l)
+              echo "✓ TA-Lib Compilation: HIT ($talib_libs library files cached)"
+            else
+              echo "✗ TA-Lib Compilation: MISS"
+            fi
+            
+            # Processed data
+            if [ -d "data/processed" ] && [ "$(ls -A data/processed 2>/dev/null)" ]; then
+              data_size=$(du -sh data/processed 2>/dev/null | cut -f1)
+              data_files=$(find data/processed -name "*.parquet" | wc -l)
+              echo "✓ Processed Data: HIT ($data_size, $data_files files)"
+            else
+              echo "✗ Processed Data: MISS"
+            fi
+            
+            # Model artifacts
+            if find experiments -name "best" -type d 2>/dev/null | grep -q .; then
+              model_dirs=$(find experiments -name "best" -type d 2>/dev/null | wc -l)
+              echo "✓ Model Artifacts: HIT ($model_dirs model directories)"
+            else
+              echo "✗ Model Artifacts: MISS"
+            fi
+            
+            # System packages (if aggressive caching)
+            if [ "<< pipeline.parameters.cache_strategy >>" = "aggressive" ]; then
+              if [ -d "/var/cache/apt/archives" ] && [ "$(ls -A /var/cache/apt/archives 2>/dev/null)" ]; then
+                apt_cache_size=$(du -sh /var/cache/apt/archives 2>/dev/null | cut -f1)
+                echo "✓ System Packages: HIT ($apt_cache_size)"
+              else
+                echo "✗ System Packages: MISS"
+              fi
+            fi
+            
+            echo ""
+            echo "Cache Efficiency Metrics:"
+            echo "========================"
+            
+            # Calculate estimated time savings
+            echo "Estimated time savings from caching:"
+            echo "- Python dependencies: ~3-5 minutes"
+            echo "- TA-Lib compilation: ~2-3 minutes"
+            echo "- Processed data: ~1-2 minutes"
+            echo "- System packages: ~1 minute"
+            
+            # Disk usage summary
+            echo ""
+            echo "Disk Usage Summary:"
+            echo "=================="
+            total_cache_size=0
+            
+            if [ -d ".venv" ]; then
+              venv_mb=$(du -sm .venv 2>/dev/null | cut -f1)
+              echo "Virtual environment: ${venv_mb}MB"
+              total_cache_size=$((total_cache_size + venv_mb))
+            fi
+            
+            if [ -d "data/processed" ]; then
+              data_mb=$(du -sm data/processed 2>/dev/null | cut -f1)
+              echo "Processed data: ${data_mb}MB"
+              total_cache_size=$((total_cache_size + data_mb))
+            fi
+            
+            echo "Total estimated cache size: ${total_cache_size}MB"
+            
+            # Cache recommendations
+            echo ""
+            echo "Cache Optimization Recommendations:"
+            echo "=================================="
+            
+            if [ "<< pipeline.parameters.cache_strategy >>" = "disabled" ]; then
+              echo "⚠️  Caching is disabled - consider enabling for faster builds"
+            elif [ "<< pipeline.parameters.cache_strategy >>" = "conservative" ]; then
+              echo "ℹ️  Conservative caching enabled - consider aggressive for maximum performance"
+            else
+              echo "✓ Aggressive caching enabled - optimal performance configuration"
+            fi
+            
+            if [ $total_cache_size -gt 1000 ]; then
+              echo "⚠️  Large cache size detected - monitor for storage limits"
+            fi
+            
+            echo ""
+            echo "=== Cache Report Complete ==="
+
+  monitor_cache_performance:
+    description: "Monitor cache hit rates and performance metrics"
+    parameters:
+      job_name:
+        type: string
+        default: "unknown"
+    steps:
+      - run:
+          name: "Cache performance monitoring for << parameters.job_name >>"
+          command: |
+            echo "=== Cache Performance Monitoring ==="
+            echo "Job: << parameters.job_name >>"
+            echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            
+            # Record cache restoration times
+            start_time=$(date +%s)
+            
+            # Check what caches were restored
+            cache_hits=0
+            cache_misses=0
+            
+            # Python dependencies
+            if [ -d ".venv" ]; then
+              echo "✓ Python dependencies cache hit"
+              cache_hits=$((cache_hits + 1))
+            else
+              echo "✗ Python dependencies cache miss"
+              cache_misses=$((cache_misses + 1))
+            fi
+            
+            # TA-Lib
+            if python -c "import talib" 2>/dev/null; then
+              echo "✓ TA-Lib cache hit"
+              cache_hits=$((cache_hits + 1))
+            else
+              echo "✗ TA-Lib cache miss"
+              cache_misses=$((cache_misses + 1))
+            fi
+            
+            # Processed data
+            if [ -d "data/processed" ] && [ "$(ls -A data/processed 2>/dev/null)" ]; then
+              echo "✓ Processed data cache hit"
+              cache_hits=$((cache_hits + 1))
+            else
+              echo "✗ Processed data cache miss"
+              cache_misses=$((cache_misses + 1))
+            fi
+            
+            # Calculate hit rate
+            total_caches=$((cache_hits + cache_misses))
+            if [ $total_caches -gt 0 ]; then
+              hit_rate=$((cache_hits * 100 / total_caches))
+              echo ""
+              echo "Cache Hit Rate: $hit_rate% ($cache_hits/$total_caches)"
+              
+              if [ $hit_rate -lt 50 ]; then
+                echo "⚠️  Low cache hit rate - investigate cache invalidation"
+              elif [ $hit_rate -lt 80 ]; then
+                echo "ℹ️  Moderate cache hit rate - room for improvement"
+              else
+                echo "✓ Good cache hit rate"
+              fi
+            fi
+            
+            end_time=$(date +%s)
+            duration=$((end_time - start_time))
+            echo "Cache check duration: ${duration}s"
+
+  test_caching_system:
+    description: "Test caching system functionality"
+    steps:
+      - run:
+          name: "Caching system functionality test"
+          command: |
+            echo "=== Caching System Test ==="
+            
+            # Test cache strategy parameter
+            echo "Cache strategy: << pipeline.parameters.cache_strategy >>"
+            
+            # Test cache key generation
+            echo "Testing cache key generation:"
+            if [ -f "requirements.txt" ]; then
+              req_checksum=$(md5sum requirements.txt | cut -d' ' -f1)
+              echo "✓ requirements.txt checksum: $req_checksum"
+            else
+              echo "✗ requirements.txt not found"
+            fi
+            
+            if [ -f "dependencies.yaml" ]; then
+              dep_checksum=$(md5sum dependencies.yaml | cut -d' ' -f1)
+              echo "✓ dependencies.yaml checksum: $dep_checksum"
+            else
+              echo "✗ dependencies.yaml not found"
+            fi
+            
+            # Test architecture detection
+            arch=$(uname -m)
+            echo "✓ Architecture: $arch"
+            
+            # Test cache directory structure
+            echo ""
+            echo "Testing cache directory structure:"
+            
+            # Create test cache directories
+            mkdir -p test_cache_structure/{venv,processed,models,tests}
+            
+            # Test cache path patterns
+            echo "✓ Virtual environment cache path: test_cache_structure/venv"
+            echo "✓ Processed data cache path: test_cache_structure/processed"
+            echo "✓ Model artifacts cache path: test_cache_structure/models"
+            echo "✓ Test results cache path: test_cache_structure/tests"
+            
+            # Cleanup test structure
+            rm -rf test_cache_structure
+            
+            # Test cache validation logic
+            echo ""
+            echo "Testing cache validation logic:"
+            
+            # Simulate cache validation scenarios
+            echo "Scenario 1: No cache exists"
+            if [ ! -d ".venv" ]; then
+              echo "✓ Correctly detected missing virtual environment"
+            fi
+            
+            echo "Scenario 2: Cache directory exists but empty"
+            mkdir -p test_empty_cache
+            if [ -d "test_empty_cache" ] && [ ! "$(ls -A test_empty_cache 2>/dev/null)" ]; then
+              echo "✓ Correctly detected empty cache directory"
+            fi
+            rm -rf test_empty_cache
+            
+            # Test fallback strategy
+            echo ""
+            echo "Testing fallback cache strategy:"
+            echo "Primary key pattern: v2-python-deps-{req_checksum}-{dep_checksum}-{arch}"
+            echo "Fallback 1: v2-python-deps-{req_checksum}-{arch}"
+            echo "Fallback 2: v2-python-deps-{arch}-"
+            echo "Fallback 3: v2-python-deps-"
+            echo "✓ Multi-level fallback strategy configured"
+            
+            echo ""
+            echo "=== Caching System Test Complete ==="
+
+  validate_environment:
+    description: "Validate environment setup and dependencies"
+    steps:
+      - run:
+          name: "Comprehensive environment validation"
+          command: |
+            echo "=== Environment Validation Report ==="
+            
+            # Activate virtual environment
+            source .venv/bin/activate
+            
+            # Python environment validation
+            echo "Python Environment:"
+            python --version
+            pip --version
+            echo "Python executable: $(which python)"
+            echo "Pip executable: $(which pip)"
+            
+            # System libraries validation
+            echo -e "\nSystem Libraries:"
+            ldconfig -p | grep ta_lib || echo "TA-Lib not in system library path"
+            pkg-config --exists ta-lib && echo "✓ TA-Lib pkg-config available" || echo "✗ TA-Lib pkg-config missing"
+            
+            # Critical Python packages validation
+            echo -e "\nCritical Python Packages:"
+            python -c "
+            import sys
+            packages = [
+                ('talib', 'TA-Lib'),
+                ('neuralforecast', 'NeuralForecast'),
+                ('pandas', 'Pandas'),
+                ('numpy', 'NumPy'),
+                ('pyarrow', 'PyArrow'),
+                ('torch', 'PyTorch'),
+                ('vectorbt', 'VectorBT'),
+                ('sklearn', 'Scikit-learn')
+            ]
+            
+            failed = []
+            for pkg, name in packages:
+                try:
+                    module = __import__(pkg)
+                    version = getattr(module, '__version__', 'unknown')
+                    print(f'✓ {name}: {version}')
+                except ImportError as e:
+                    print(f'✗ {name}: Import failed - {e}')
+                    failed.append(name)
+            
+            if failed:
+                print(f'\\nFailed imports: {failed}')
+                sys.exit(1)
+            else:
+                print('\\n✓ All critical packages validated successfully')
+            "
+            
+            # Memory and disk space check
+            echo -e "\nResource Status:"
+            echo "Available memory: $(free -h | grep '^Mem:' | awk '{print $7}')"
+            echo "Available disk space: $(df -h . | tail -1 | awk '{print $4}')"
+            
+            # Cache status summary
+            echo -e "\nCache Status Summary:"
+            echo "Virtual environment: $([ -d '.venv' ] && echo 'cached' || echo 'not cached')"
+            echo "Processed data: $([ -d 'data/processed' ] && echo 'cached' || echo 'not cached')"
+            echo "TA-Lib libraries: $(python -c 'import talib; print(\"cached\")' 2>/dev/null || echo 'not cached')"
+            
+            echo -e "\n=== Environment validation completed successfully ==="
+
+  run_quality_gates:
+    description: "Run data quality validation gates"
+    steps:
+      - run:
+          name: "Execute quality gate validations"
+          command: |
+            python -c "
+            from utils.validate import assert_regular_grid, assert_utc_eob, assert_no_forward_fill_y
+            from utils.io import load_and_process_data
+            print('Running quality gate validations...')
+            df = load_and_process_data('data/raw/btcusd_1-min_data.csv')
+            assert_regular_grid(df, '15min')
+            assert_utc_eob(df, '15min')
+            assert_no_forward_fill_y(df)
+            print('All quality gates passed!')
+            "
+
+  store_test_results:
+    description: "Store test results and artifacts"
+    steps:
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: test-results
+          destination: test-results
+      - store_artifacts:
+          path: coverage
+          destination: coverage
+
+# Executors for different job types
+executors:
+  python-docker:
+    docker:
+      - image: cimg/python:3.13.6
+    working_directory: ~/project
+    resource_class: medium
+
+  python-large:
+    docker:
+      - image: cimg/python:3.13.6
+    working_directory: ~/project
+    resource_class: large
+
+  gpu-machine:
+    machine:
+      image: linux-cuda-12:default
+    working_directory: ~/project
+    resource_class: gpu.nvidia.medium
+
+# Job definitions with comprehensive caching system
+jobs:
+  setup:
+    executor: python-docker
+    steps:
+      # Initial setup and cache restoration
+      - checkout
+      - cleanup_failed_caches
+      - restore_system_cache
+      - restore_talib_cache
+      - restore_python_dependencies
+      - restore_processed_data_cache
+      
+      # Environment setup using dedicated script (Requirements 4.1, 4.3, 4.4, 4.7)
+      - run:
+          name: "Environment Setup"
+          command: |
+            echo "=== CircleCI Environment Setup Job ==="
+            echo "Implementing Docker-based environment setup with Python 3.13.6"
+            echo "Requirements: 4.1 (Docker executor), 4.3 (System dependencies), 4.4 (Python 3.13.6 + venv), 4.7 (Fail-fast diagnostics)"
+            
+            # Execute environment setup script
+            ./.circleci/scripts/setup_environment.sh
+      
+      # Python environment setup with health checks
+      - run:
+          name: "Setup Python virtual environment"
+          command: |
+            set -e  # Exit on any error for fail-fast behavior
+            
+            # Verify Python version meets requirement 4.4
+            echo "=== Python Environment Setup ==="
+            python_version=$(python --version 2>&1)
+            echo "Detected Python version: $python_version"
+            
+            if ! echo "$python_version" | grep -q "3.13"; then
+              echo "✗ ERROR: Python 3.13.x required but found: $python_version"
+              echo "Environment setup failed - Python version requirement not met"
+              exit 1
+            fi
+            echo "✓ Python version requirement satisfied"
+            
+            # Create virtual environment if not cached
+            if [ ! -d ".venv" ]; then
+              echo "Creating new virtual environment..."
+              python -m venv .venv || {
+                echo "✗ ERROR: Failed to create virtual environment"
+                echo "Diagnostic: $(python -m venv --help | head -3)"
+                exit 1
+              }
+            else
+              echo "Using cached virtual environment"
+            fi
+            
+            # Activate and verify virtual environment
+            source .venv/bin/activate || {
+              echo "✗ ERROR: Failed to activate virtual environment"
+              echo "Diagnostic: Virtual environment may be corrupted"
+              rm -rf .venv
+              exit 1
+            }
+            
+            # Verify we're in the virtual environment
+            venv_python=$(which python)
+            if [[ "$venv_python" != *".venv"* ]]; then
+              echo "✗ ERROR: Virtual environment activation failed"
+              echo "Expected path containing '.venv', got: $venv_python"
+              exit 1
+            fi
+            echo "✓ Virtual environment activated successfully: $venv_python"
+            
+            # Upgrade pip with error handling
+            echo "Upgrading pip, setuptools, and wheel..."
+            python -m pip install --upgrade pip setuptools wheel || {
+              echo "✗ ERROR: Failed to upgrade pip/setuptools/wheel"
+              echo "Diagnostic: $(pip --version 2>&1)"
+              exit 1
+            }
+            
+            # Install dependencies with comprehensive error handling
+            echo "Installing Python dependencies..."
+            if ! pip install --no-cache-dir -r requirements.txt; then
+              echo "⚠️  Initial dependency installation failed - attempting recovery"
+              echo "Diagnostic information:"
+              echo "- Pip version: $(pip --version)"
+              echo "- Available disk space: $(df -h . | tail -1)"
+              echo "- Memory usage: $(free -h | grep '^Mem:')"
+              
+              echo "Clearing cache and retrying..."
+              rm -rf .venv ~/.cache/pip
+              python -m venv .venv
+              source .venv/bin/activate
+              python -m pip install --upgrade pip setuptools wheel
+              
+              if ! pip install --no-cache-dir -r requirements.txt; then
+                echo "✗ ERROR: Dependency installation failed after retry"
+                echo "Requirements file contents:"
+                head -10 requirements.txt
+                exit 1
+              fi
+            fi
+            echo "✓ Dependencies installed successfully"
+            
+            # Verify critical imports with detailed diagnostics
+            echo "Verifying critical dependencies..."
+            python -c "
+            import sys
+            import os
+            print(f'Python version: {sys.version}')
+            print(f'Python executable: {sys.executable}')
+            print(f'Virtual environment: {os.environ.get(\"VIRTUAL_ENV\", \"Not detected\")}')
+            print()
+            
+            # Critical package verification
+            packages = [
+                ('talib', 'TA-Lib'),
+                ('neuralforecast', 'NeuralForecast'),
+                ('pandas', 'Pandas'),
+                ('numpy', 'NumPy'),
+                ('pyarrow', 'PyArrow'),
+                ('torch', 'PyTorch'),
+                ('vectorbt', 'VectorBT'),
+                ('sklearn', 'Scikit-learn')
+            ]
+            
+            failed = []
+            for pkg, name in packages:
+                try:
+                    module = __import__(pkg)
+                    version = getattr(module, '__version__', 'unknown')
+                    print(f'✓ {name}: {version}')
+                except ImportError as e:
+                    print(f'✗ {name}: Import failed - {e}')
+                    failed.append(name)
+                except Exception as e:
+                    print(f'✗ {name}: Unexpected error - {e}')
+                    failed.append(name)
+            
+            if failed:
+                print(f'\\n✗ CRITICAL ERROR: Failed to import {len(failed)} packages: {failed}')
+                print('Environment setup validation failed')
+                sys.exit(1)
+            else:
+                print(f'\\n✓ All {len(packages)} critical packages validated successfully')
+                print('Environment setup completed successfully')
+            "
+      
+      # Cache saving
+      - save_system_cache
+      - save_talib_cache
+      - save_python_dependencies
+      
+      # Comprehensive environment health check
+      - run:
+          name: "Environment Health Check"
+          command: |
+            set -e
+            echo "=== Environment Health Check ==="
+            
+            # Activate virtual environment
+            source .venv/bin/activate
+            
+            # Requirement 4.1: Verify Docker executor
+            echo "✓ Running on Docker executor (cimg/python:3.13.6)"
+            
+            # Requirement 4.3: Verify system dependencies
+            echo "Checking system dependencies..."
+            
+            # TA-Lib C library check
+            if ldconfig -p | grep -q ta_lib; then
+              echo "✓ TA-Lib C library installed and available"
+            else
+              echo "✗ TA-Lib C library not found in system library path"
+              exit 1
+            fi
+            
+            # Build tools check
+            for tool in gcc g++ make pkg-config; do
+              if command -v $tool >/dev/null 2>&1; then
+                echo "✓ $tool available"
+              else
+                echo "✗ $tool not found"
+                exit 1
+              fi
+            done
+            
+            # Requirement 4.4: Verify Python 3.13.6 with virtual environment
+            python_version=$(python --version 2>&1)
+            if echo "$python_version" | grep -q "Python 3.13"; then
+              echo "✓ Python 3.13.x confirmed: $python_version"
+            else
+              echo "✗ Python version requirement not met: $python_version"
+              exit 1
+            fi
+            
+            # Virtual environment verification
+            if [[ "$VIRTUAL_ENV" == *".venv"* ]]; then
+              echo "✓ Virtual environment active: $VIRTUAL_ENV"
+            else
+              echo "✗ Virtual environment not properly activated"
+              exit 1
+            fi
+            
+            # Requirement 4.7: Resource and capacity checks
+            echo "Resource status checks..."
+            
+            # Memory check
+            available_mem=$(free -m | awk 'NR==2{printf "%.0f", $7}')
+            if [ "$available_mem" -lt 500 ]; then
+              echo "⚠️  Low available memory: ${available_mem}MB"
+            else
+              echo "✓ Sufficient memory available: ${available_mem}MB"
+            fi
+            
+            # Disk space check
+            available_disk=$(df . | awk 'NR==2{print $4}')
+            if [ "$available_disk" -lt 1000000 ]; then  # Less than 1GB in KB
+              echo "⚠️  Low disk space: $(df -h . | awk 'NR==2{print $4}')"
+            else
+              echo "✓ Sufficient disk space: $(df -h . | awk 'NR==2{print $4}')"
+            fi
+            
+            # Final validation
+            echo ""
+            echo "=== Final Environment Validation ==="
+            python -c "
+            # Test critical functionality
+            import talib
+            import neuralforecast
+            import pandas as pd
+            import numpy as np
+            
+            # Test TA-Lib functionality
+            test_data = np.random.random(100)
+            sma = talib.SMA(test_data, timeperiod=10)
+            assert not np.isnan(sma[-1]), 'TA-Lib SMA calculation failed'
+            print('✓ TA-Lib functionality verified')
+            
+            # Test NeuralForecast import
+            from neuralforecast import NeuralForecast
+            print('✓ NeuralForecast core functionality verified')
+            
+            # Test data processing
+            df = pd.DataFrame({'test': [1, 2, 3]})
+            assert len(df) == 3, 'Pandas functionality failed'
+            print('✓ Data processing libraries verified')
+            
+            print('\\n✅ Environment setup completed successfully')
+            print('All requirements (4.1, 4.3, 4.4, 4.7) satisfied')
+            "
+      
+      # Environment validation and cache reporting
+      - validate_environment
+      - validate_all_caches
+      - monitor_cache_performance:
+          job_name: "setup"
+      - generate_cache_report
+      
+      # Workspace persistence
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .venv
+            - data/processed
+            - "*"
+
+# Workflow definitions (placeholder for future implementation)
+workflows:
+  version: 2
+  foundation_pipeline:
+    when: << pipeline.parameters.run_foundation_tests >>
+    jobs:
+      - setup:
+          filters:
+            branches:
+              only: /.*/

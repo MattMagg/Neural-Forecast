@@ -1,0 +1,395 @@
+2025-08-27 00:14:10,844 - INFO - Starting Feature Engineering Validation
+2025-08-27 00:14:10,845 - INFO - === Feature Registry Validation ===
+2025-08-27 00:14:10,847 - INFO - Total indicators in registry: 13
+2025-08-27 00:14:10,847 - INFO - Historical indicators: 10 - ['rsi', 'roc', 'stoch_k', 'macd', 'atr', 'nvol', 'obv', 'mfi', 'bbands', 'donchian']
+2025-08-27 00:14:10,847 - INFO - Future indicators: 3 - ['minute_of_day', 'day_of_week', 'is_weekend']
+2025-08-27 00:14:10,847 - INFO - MTF targets configured: 3 timeframes
+2025-08-27 00:14:10,847 - INFO -   30min: ['rsi', 'roc', 'atr', 'bbands']
+2025-08-27 00:14:10,847 - INFO -   1h: ['rsi', 'roc', 'atr', 'bbands', 'macd']
+2025-08-27 00:14:10,847 - INFO -   4h: ['rsi', 'atr', 'bbands']
+2025-08-27 00:14:10,847 - INFO - ✓ Feature registry validation passed
+2025-08-27 00:14:10,847 - INFO - === Feature Computation Validation ===
+2025-08-27 00:14:12,179 - INFO - Loading processed BTC data...
+2025-08-27 00:14:15,059 - INFO - Loaded 477464 rows of canonical data
+2025-08-27 00:14:15,060 - INFO - Computing base 15-minute indicators...
+2025-08-27 00:14:25,327 - INFO - Generated 30 base indicator columns
+2025-08-27 00:14:25,327 - INFO - Sample indicator columns: ['rsi_t7', 'rsi_t14', 'rsi_t28', 'roc_t4', 'roc_t8', 'roc_t16', 'roc_t32', 'stoch_k_slowk_f14_s3_s3', 'stoch_k_slowd_f14_s3_s3', 'macd_macd_f8_s21_s9']
+2025-08-27 00:14:25,327 - INFO - ✓ Found 3 columns for rsi_
+2025-08-27 00:14:25,327 - INFO - ✓ Found 4 columns for roc_
+2025-08-27 00:14:25,327 - INFO - ✓ Found 3 columns for atr_
+2025-08-27 00:14:25,327 - INFO - ✓ Found 6 columns for macd_
+2025-08-27 00:14:25,327 - INFO - ✓ Found 1 columns for bbands_
+2025-08-27 00:14:25,327 - INFO - ✓ Found 1 columns for obv
+2025-08-27 00:14:25,327 - INFO - ✓ Found 1 columns for mfi_
+2025-08-27 00:14:25,327 - INFO - Computing multi-timeframe indicators...
+2025-08-27 00:14:25,337 - ERROR - Feature computation validation failed: '30min'
+2025-08-27 00:14:25,338 - ERROR - Traceback (most recent call last):
+  File "/Users/mac-main/Neural-Forecast/.circleci/scripts/validate_feature_engineering.py", line 120, in validate_feature_computation
+    df_mtf = apply_mtf(df_canonical)
+  File "/Users/mac-main/Neural-Forecast/features/builder.py", line 163, in apply_mtf
+    add = _compute_mtf_one(df_ohlcv_15m, tf, names)
+  File "/Users/mac-main/Neural-Forecast/features/builder.py", line 135, in _compute_mtf_one
+    df_hi = resample_to_interval(base.set_index("ds"), tf)  # returns columns with suffixes like 'close'
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/technical/util.py", line 59, in resample_to_interval
+    interval = TICKER_INTERVAL_MINUTES[interval]
+               ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+KeyError: '30min'
+
+2025-08-27 00:14:25,350 - ERROR - Feature computation validation failed
+2025-08-27 00:15:44,314 - INFO - Starting Feature Engineering Validation
+2025-08-27 00:15:44,314 - INFO - === Feature Registry Validation ===
+2025-08-27 00:15:44,316 - INFO - Total indicators in registry: 13
+2025-08-27 00:15:44,316 - INFO - Historical indicators: 10 - ['rsi', 'roc', 'stoch_k', 'macd', 'atr', 'nvol', 'obv', 'mfi', 'bbands', 'donchian']
+2025-08-27 00:15:44,316 - INFO - Future indicators: 3 - ['minute_of_day', 'day_of_week', 'is_weekend']
+2025-08-27 00:15:44,316 - INFO - MTF targets configured: 3 timeframes
+2025-08-27 00:15:44,316 - INFO -   30m: ['rsi', 'roc', 'atr', 'bbands']
+2025-08-27 00:15:44,316 - INFO -   1h: ['rsi', 'roc', 'atr', 'bbands', 'macd']
+2025-08-27 00:15:44,316 - INFO -   4h: ['rsi', 'atr', 'bbands']
+2025-08-27 00:15:44,316 - INFO - ✓ Feature registry validation passed
+2025-08-27 00:15:44,316 - INFO - === Feature Computation Validation ===
+2025-08-27 00:15:45,260 - INFO - Loading processed BTC data...
+2025-08-27 00:15:48,061 - INFO - Loaded 477464 rows of canonical data
+2025-08-27 00:15:48,061 - INFO - Computing base 15-minute indicators...
+2025-08-27 00:15:58,153 - INFO - Generated 30 base indicator columns
+2025-08-27 00:15:58,153 - INFO - Sample indicator columns: ['rsi_t7', 'rsi_t14', 'rsi_t28', 'roc_t4', 'roc_t8', 'roc_t16', 'roc_t32', 'stoch_k_slowk_f14_s3_s3', 'stoch_k_slowd_f14_s3_s3', 'macd_macd_f8_s21_s9']
+2025-08-27 00:15:58,153 - INFO - ✓ Found 3 columns for rsi_
+2025-08-27 00:15:58,153 - INFO - ✓ Found 4 columns for roc_
+2025-08-27 00:15:58,153 - INFO - ✓ Found 3 columns for atr_
+2025-08-27 00:15:58,153 - INFO - ✓ Found 6 columns for macd_
+2025-08-27 00:15:58,153 - INFO - ✓ Found 1 columns for bbands_
+2025-08-27 00:15:58,153 - INFO - ✓ Found 1 columns for obv
+2025-08-27 00:15:58,153 - INFO - ✓ Found 1 columns for mfi_
+2025-08-27 00:15:58,153 - INFO - Computing multi-timeframe indicators...
+2025-08-27 00:15:58,165 - ERROR - Feature computation validation failed: 'date'
+2025-08-27 00:15:58,169 - ERROR - Traceback (most recent call last):
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/pandas/core/indexes/base.py", line 3805, in get_loc
+    return self._engine.get_loc(casted_key)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "index.pyx", line 167, in pandas._libs.index.IndexEngine.get_loc
+  File "index.pyx", line 196, in pandas._libs.index.IndexEngine.get_loc
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7081, in pandas._libs.hashtable.PyObjectHashTable.get_item
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7089, in pandas._libs.hashtable.PyObjectHashTable.get_item
+KeyError: 'date'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/mac-main/Neural-Forecast/.circleci/scripts/validate_feature_engineering.py", line 120, in validate_feature_computation
+    df_mtf = apply_mtf(df_canonical)
+  File "/Users/mac-main/Neural-Forecast/features/builder.py", line 163, in apply_mtf
+    add = _compute_mtf_one(df_ohlcv_15m, tf, names)
+  File "/Users/mac-main/Neural-Forecast/features/builder.py", line 135, in _compute_mtf_one
+    df_hi = resample_to_interval(base.set_index("ds"), tf)  # returns columns with suffixes like 'close'
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/technical/util.py", line 62, in resample_to_interval
+    df = df.set_index(DatetimeIndex(df["date"]))
+                                    ~~^^^^^^^^
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/pandas/core/frame.py", line 4102, in __getitem__
+    indexer = self.columns.get_loc(key)
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/pandas/core/indexes/base.py", line 3812, in get_loc
+    raise KeyError(key) from err
+KeyError: 'date'
+
+2025-08-27 00:15:58,177 - ERROR - Feature computation validation failed
+2025-08-27 00:16:12,201 - INFO - Starting Feature Engineering Validation
+2025-08-27 00:16:12,202 - INFO - === Feature Registry Validation ===
+2025-08-27 00:16:12,202 - INFO - Total indicators in registry: 13
+2025-08-27 00:16:12,202 - INFO - Historical indicators: 10 - ['rsi', 'roc', 'stoch_k', 'macd', 'atr', 'nvol', 'obv', 'mfi', 'bbands', 'donchian']
+2025-08-27 00:16:12,202 - INFO - Future indicators: 3 - ['minute_of_day', 'day_of_week', 'is_weekend']
+2025-08-27 00:16:12,202 - INFO - MTF targets configured: 3 timeframes
+2025-08-27 00:16:12,202 - INFO -   30m: ['rsi', 'roc', 'atr', 'bbands']
+2025-08-27 00:16:12,202 - INFO -   1h: ['rsi', 'roc', 'atr', 'bbands', 'macd']
+2025-08-27 00:16:12,202 - INFO -   4h: ['rsi', 'atr', 'bbands']
+2025-08-27 00:16:12,202 - INFO - ✓ Feature registry validation passed
+2025-08-27 00:16:12,202 - INFO - === Feature Computation Validation ===
+2025-08-27 00:16:13,158 - INFO - Loading processed BTC data...
+2025-08-27 00:16:16,032 - INFO - Loaded 477464 rows of canonical data
+2025-08-27 00:16:16,033 - INFO - Computing base 15-minute indicators...
+2025-08-27 00:16:26,182 - INFO - Generated 30 base indicator columns
+2025-08-27 00:16:26,182 - INFO - Sample indicator columns: ['rsi_t7', 'rsi_t14', 'rsi_t28', 'roc_t4', 'roc_t8', 'roc_t16', 'roc_t32', 'stoch_k_slowk_f14_s3_s3', 'stoch_k_slowd_f14_s3_s3', 'macd_macd_f8_s21_s9']
+2025-08-27 00:16:26,182 - INFO - ✓ Found 3 columns for rsi_
+2025-08-27 00:16:26,182 - INFO - ✓ Found 4 columns for roc_
+2025-08-27 00:16:26,182 - INFO - ✓ Found 3 columns for atr_
+2025-08-27 00:16:26,182 - INFO - ✓ Found 6 columns for macd_
+2025-08-27 00:16:26,182 - INFO - ✓ Found 1 columns for bbands_
+2025-08-27 00:16:26,182 - INFO - ✓ Found 1 columns for obv
+2025-08-27 00:16:26,182 - INFO - ✓ Found 1 columns for mfi_
+2025-08-27 00:16:26,182 - INFO - Computing multi-timeframe indicators...
+2025-08-27 00:16:26,197 - ERROR - Feature computation validation failed: 'date'
+2025-08-27 00:16:26,201 - ERROR - Traceback (most recent call last):
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/pandas/core/indexes/base.py", line 3805, in get_loc
+    return self._engine.get_loc(casted_key)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "index.pyx", line 167, in pandas._libs.index.IndexEngine.get_loc
+  File "index.pyx", line 196, in pandas._libs.index.IndexEngine.get_loc
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7081, in pandas._libs.hashtable.PyObjectHashTable.get_item
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7089, in pandas._libs.hashtable.PyObjectHashTable.get_item
+KeyError: 'date'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/mac-main/Neural-Forecast/.circleci/scripts/validate_feature_engineering.py", line 120, in validate_feature_computation
+    df_mtf = apply_mtf(df_canonical)
+  File "/Users/mac-main/Neural-Forecast/features/builder.py", line 165, in apply_mtf
+    add = _compute_mtf_one(df_ohlcv_15m, tf, names)
+  File "/Users/mac-main/Neural-Forecast/features/builder.py", line 137, in _compute_mtf_one
+    df_hi = resample_to_interval(base_for_resample.set_index("date"), tf)  # returns columns with suffixes like 'close'
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/technical/util.py", line 62, in resample_to_interval
+    df = df.set_index(DatetimeIndex(df["date"]))
+                                    ~~^^^^^^^^
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/pandas/core/frame.py", line 4102, in __getitem__
+    indexer = self.columns.get_loc(key)
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/pandas/core/indexes/base.py", line 3812, in get_loc
+    raise KeyError(key) from err
+KeyError: 'date'
+
+2025-08-27 00:16:26,209 - ERROR - Feature computation validation failed
+2025-08-27 00:16:54,823 - INFO - Starting Feature Engineering Validation
+2025-08-27 00:16:54,823 - INFO - === Feature Registry Validation ===
+2025-08-27 00:16:54,823 - INFO - Total indicators in registry: 13
+2025-08-27 00:16:54,823 - INFO - Historical indicators: 10 - ['rsi', 'roc', 'stoch_k', 'macd', 'atr', 'nvol', 'obv', 'mfi', 'bbands', 'donchian']
+2025-08-27 00:16:54,824 - INFO - Future indicators: 3 - ['minute_of_day', 'day_of_week', 'is_weekend']
+2025-08-27 00:16:54,824 - INFO - MTF targets configured: 3 timeframes
+2025-08-27 00:16:54,824 - INFO -   30m: ['rsi', 'roc', 'atr', 'bbands']
+2025-08-27 00:16:54,824 - INFO -   1h: ['rsi', 'roc', 'atr', 'bbands', 'macd']
+2025-08-27 00:16:54,824 - INFO -   4h: ['rsi', 'atr', 'bbands']
+2025-08-27 00:16:54,824 - INFO - ✓ Feature registry validation passed
+2025-08-27 00:16:54,824 - INFO - === Feature Computation Validation ===
+2025-08-27 00:16:55,766 - INFO - Loading processed BTC data...
+2025-08-27 00:16:58,597 - INFO - Loaded 477464 rows of canonical data
+2025-08-27 00:16:58,598 - INFO - Computing base 15-minute indicators...
+2025-08-27 00:17:08,628 - INFO - Generated 30 base indicator columns
+2025-08-27 00:17:08,628 - INFO - Sample indicator columns: ['rsi_t7', 'rsi_t14', 'rsi_t28', 'roc_t4', 'roc_t8', 'roc_t16', 'roc_t32', 'stoch_k_slowk_f14_s3_s3', 'stoch_k_slowd_f14_s3_s3', 'macd_macd_f8_s21_s9']
+2025-08-27 00:17:08,628 - INFO - ✓ Found 3 columns for rsi_
+2025-08-27 00:17:08,628 - INFO - ✓ Found 4 columns for roc_
+2025-08-27 00:17:08,628 - INFO - ✓ Found 3 columns for atr_
+2025-08-27 00:17:08,628 - INFO - ✓ Found 6 columns for macd_
+2025-08-27 00:17:08,628 - INFO - ✓ Found 1 columns for bbands_
+2025-08-27 00:17:08,628 - INFO - ✓ Found 1 columns for obv
+2025-08-27 00:17:08,628 - INFO - ✓ Found 1 columns for mfi_
+2025-08-27 00:17:08,628 - INFO - Computing multi-timeframe indicators...
+2025-08-27 00:17:10,992 - ERROR - Feature computation validation failed: 'ds'
+2025-08-27 00:17:10,996 - ERROR - Traceback (most recent call last):
+  File "/Users/mac-main/Neural-Forecast/.circleci/scripts/validate_feature_engineering.py", line 120, in validate_feature_computation
+    df_mtf = apply_mtf(df_canonical)
+  File "/Users/mac-main/Neural-Forecast/features/builder.py", line 187, in apply_mtf
+    out = out.merge(add, on="ds", how="left")
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/pandas/core/frame.py", line 10832, in merge
+    return merge(
+        self,
+    ...<11 lines>...
+        validate=validate,
+    )
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/pandas/core/reshape/merge.py", line 170, in merge
+    op = _MergeOperation(
+        left_df,
+    ...<10 lines>...
+        validate=validate,
+    )
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/pandas/core/reshape/merge.py", line 794, in __init__
+    ) = self._get_merge_keys()
+        ~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/pandas/core/reshape/merge.py", line 1297, in _get_merge_keys
+    right_keys.append(right._get_label_or_level_values(rk))
+                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/pandas/core/generic.py", line 1911, in _get_label_or_level_values
+    raise KeyError(key)
+KeyError: 'ds'
+
+2025-08-27 00:17:11,002 - ERROR - Feature computation validation failed
+2025-08-27 00:17:20,753 - INFO - Starting Feature Engineering Validation
+2025-08-27 00:17:20,754 - INFO - === Feature Registry Validation ===
+2025-08-27 00:17:20,754 - INFO - Total indicators in registry: 13
+2025-08-27 00:17:20,754 - INFO - Historical indicators: 10 - ['rsi', 'roc', 'stoch_k', 'macd', 'atr', 'nvol', 'obv', 'mfi', 'bbands', 'donchian']
+2025-08-27 00:17:20,754 - INFO - Future indicators: 3 - ['minute_of_day', 'day_of_week', 'is_weekend']
+2025-08-27 00:17:20,754 - INFO - MTF targets configured: 3 timeframes
+2025-08-27 00:17:20,754 - INFO -   30m: ['rsi', 'roc', 'atr', 'bbands']
+2025-08-27 00:17:20,754 - INFO -   1h: ['rsi', 'roc', 'atr', 'bbands', 'macd']
+2025-08-27 00:17:20,754 - INFO -   4h: ['rsi', 'atr', 'bbands']
+2025-08-27 00:17:20,754 - INFO - ✓ Feature registry validation passed
+2025-08-27 00:17:20,754 - INFO - === Feature Computation Validation ===
+2025-08-27 00:17:21,719 - INFO - Loading processed BTC data...
+2025-08-27 00:17:24,533 - INFO - Loaded 477464 rows of canonical data
+2025-08-27 00:17:24,533 - INFO - Computing base 15-minute indicators...
+2025-08-27 00:17:34,604 - INFO - Generated 30 base indicator columns
+2025-08-27 00:17:34,605 - INFO - Sample indicator columns: ['rsi_t7', 'rsi_t14', 'rsi_t28', 'roc_t4', 'roc_t8', 'roc_t16', 'roc_t32', 'stoch_k_slowk_f14_s3_s3', 'stoch_k_slowd_f14_s3_s3', 'macd_macd_f8_s21_s9']
+2025-08-27 00:17:34,605 - INFO - ✓ Found 3 columns for rsi_
+2025-08-27 00:17:34,605 - INFO - ✓ Found 4 columns for roc_
+2025-08-27 00:17:34,605 - INFO - ✓ Found 3 columns for atr_
+2025-08-27 00:17:34,605 - INFO - ✓ Found 6 columns for macd_
+2025-08-27 00:17:34,605 - INFO - ✓ Found 1 columns for bbands_
+2025-08-27 00:17:34,605 - INFO - ✓ Found 1 columns for obv
+2025-08-27 00:17:34,605 - INFO - ✓ Found 1 columns for mfi_
+2025-08-27 00:17:34,605 - INFO - Computing multi-timeframe indicators...
+2025-08-27 00:17:39,121 - INFO - Generated 41 MTF indicator columns
+2025-08-27 00:17:39,121 - WARNING - No MTF columns found for timeframe _30min
+2025-08-27 00:17:39,121 - INFO - ✓ Found 19 columns for timeframe _1h
+2025-08-27 00:17:39,121 - INFO - ✓ Found 9 columns for timeframe _4h
+2025-08-27 00:17:39,121 - INFO - Combining base and MTF indicators...
+2025-08-27 00:17:39,247 - INFO - Total combined features before processing: 71
+2025-08-27 00:17:39,248 - INFO - ✓ Feature computation validation passed
+2025-08-27 00:17:39,257 - INFO - === Shift Discipline and Leakage Prevention Validation ===
+2025-08-27 00:17:39,257 - INFO - Applying shift(1) and pruning...
+2025-08-27 00:17:39,843 - INFO - Features after shift and pruning: 52
+2025-08-27 00:17:39,843 - INFO - Historical columns to validate for shift: 50
+2025-08-27 00:17:39,906 - INFO - Testing leakage detection with assert_shifted...
+2025-08-27 00:17:40,218 - INFO - ✓ No leakage detected in historical features
+2025-08-27 00:17:40,218 - INFO - Future columns (should not be shifted): 2
+2025-08-27 00:17:40,218 - INFO - ✓ Shift discipline validation passed
+2025-08-27 00:17:40,222 - INFO - === Feature Selection Validation ===
+2025-08-27 00:17:40,222 - INFO - Testing feature selection with 256 cap...
+2025-08-27 00:18:51,263 - INFO - Selected features: 28 total
+2025-08-27 00:18:51,263 - INFO -   Historical: 26
+2025-08-27 00:18:51,263 - INFO -   Future: 2
+2025-08-27 00:18:51,263 - INFO -   Static: 0
+2025-08-27 00:18:51,263 - INFO - ✓ Feature selection validation passed
+2025-08-27 00:18:51,263 - INFO - === MTF Alignment Validation ===
+2025-08-27 00:18:51,263 - INFO - Loading data for MTF alignment testing...
+2025-08-27 00:18:54,224 - INFO - Using 1000 rows for MTF testing
+2025-08-27 00:18:54,268 - ERROR - MTF timestamps not properly aligned with base data
+2025-08-27 00:18:54,272 - ERROR - MTF alignment validation failed
+2025-08-27 00:19:22,504 - INFO - Starting Feature Engineering Validation
+2025-08-27 00:19:22,504 - INFO - === Feature Registry Validation ===
+2025-08-27 00:19:22,505 - INFO - Total indicators in registry: 13
+2025-08-27 00:19:22,505 - INFO - Historical indicators: 10 - ['rsi', 'roc', 'stoch_k', 'macd', 'atr', 'nvol', 'obv', 'mfi', 'bbands', 'donchian']
+2025-08-27 00:19:22,505 - INFO - Future indicators: 3 - ['minute_of_day', 'day_of_week', 'is_weekend']
+2025-08-27 00:19:22,505 - INFO - MTF targets configured: 3 timeframes
+2025-08-27 00:19:22,505 - INFO -   30m: ['rsi', 'roc', 'atr', 'bbands']
+2025-08-27 00:19:22,505 - INFO -   1h: ['rsi', 'roc', 'atr', 'bbands', 'macd']
+2025-08-27 00:19:22,505 - INFO -   4h: ['rsi', 'atr', 'bbands']
+2025-08-27 00:19:22,505 - INFO - ✓ Feature registry validation passed
+2025-08-27 00:19:22,505 - INFO - === Feature Computation Validation ===
+2025-08-27 00:19:23,746 - INFO - Loading processed BTC data...
+2025-08-27 00:19:26,587 - INFO - Loaded 477464 rows of canonical data
+2025-08-27 00:19:26,587 - INFO - Computing base 15-minute indicators...
+2025-08-27 00:19:36,732 - INFO - Generated 30 base indicator columns
+2025-08-27 00:19:36,732 - INFO - Sample indicator columns: ['rsi_t7', 'rsi_t14', 'rsi_t28', 'roc_t4', 'roc_t8', 'roc_t16', 'roc_t32', 'stoch_k_slowk_f14_s3_s3', 'stoch_k_slowd_f14_s3_s3', 'macd_macd_f8_s21_s9']
+2025-08-27 00:19:36,732 - INFO - ✓ Found 3 columns for rsi_
+2025-08-27 00:19:36,732 - INFO - ✓ Found 4 columns for roc_
+2025-08-27 00:19:36,732 - INFO - ✓ Found 3 columns for atr_
+2025-08-27 00:19:36,732 - INFO - ✓ Found 6 columns for macd_
+2025-08-27 00:19:36,732 - INFO - ✓ Found 1 columns for bbands_
+2025-08-27 00:19:36,732 - INFO - ✓ Found 1 columns for obv
+2025-08-27 00:19:36,732 - INFO - ✓ Found 1 columns for mfi_
+2025-08-27 00:19:36,732 - INFO - Computing multi-timeframe indicators...
+2025-08-27 00:19:41,241 - INFO - Generated 41 MTF indicator columns
+2025-08-27 00:19:41,241 - WARNING - No MTF columns found for timeframe _30min
+2025-08-27 00:19:41,241 - INFO - ✓ Found 19 columns for timeframe _1h
+2025-08-27 00:19:41,241 - INFO - ✓ Found 9 columns for timeframe _4h
+2025-08-27 00:19:41,241 - INFO - Combining base and MTF indicators...
+2025-08-27 00:19:41,351 - INFO - Total combined features before processing: 71
+2025-08-27 00:19:41,352 - INFO - ✓ Feature computation validation passed
+2025-08-27 00:19:41,359 - INFO - === Shift Discipline and Leakage Prevention Validation ===
+2025-08-27 00:19:41,360 - INFO - Applying shift(1) and pruning...
+2025-08-27 00:19:41,883 - INFO - Features after shift and pruning: 52
+2025-08-27 00:19:41,883 - INFO - Historical columns to validate for shift: 50
+2025-08-27 00:19:41,941 - INFO - Testing leakage detection with assert_shifted...
+2025-08-27 00:19:42,201 - INFO - ✓ No leakage detected in historical features
+2025-08-27 00:19:42,201 - INFO - Future columns (should not be shifted): 2
+2025-08-27 00:19:42,201 - INFO - ✓ Shift discipline validation passed
+2025-08-27 00:19:42,207 - INFO - === Feature Selection Validation ===
+2025-08-27 00:19:42,207 - INFO - Testing feature selection with 256 cap...
+2025-08-27 00:20:52,399 - INFO - Selected features: 28 total
+2025-08-27 00:20:52,399 - INFO -   Historical: 26
+2025-08-27 00:20:52,399 - INFO -   Future: 2
+2025-08-27 00:20:52,399 - INFO -   Static: 0
+2025-08-27 00:20:52,399 - INFO - ✓ Feature selection validation passed
+2025-08-27 00:20:52,399 - INFO - === MTF Alignment Validation ===
+2025-08-27 00:20:52,399 - INFO - Loading data for MTF alignment testing...
+2025-08-27 00:20:55,281 - INFO - Using 1000 rows for MTF testing
+2025-08-27 00:20:55,329 - INFO - ✓ MTF alignment validation passed
+2025-08-27 00:20:55,332 - INFO - === Generating Feature Engineering Artifacts ===
+2025-08-27 00:20:55,359 - ERROR - Failed to generate feature artifacts: Duplicate column names found: ['ds', 'ds', 'roc_t4', 'roc_t8', 'roc_t16', 'roc_t32', 'obv', 'mfi_t14', 'donchian_DCL_20_20_l20_u20', 'donchian_DCM_20_20_l20_u20', 'donchian_DCU_20_20_l20_u20', 'minute_of_day', 'day_of_week', 'rsi_t7_30m', 'rsi_t14_30m', 'rsi_t28_30m', 'roc_t4_30m', 'roc_t8_30m', 'roc_t16_30m', 'roc_t32_30m', 'atr_t8_30m', 'atr_t16_30m', 'atr_t32_30m', 'bbands_upperband_t20_n2_n2_30m', 'bbands_middleband_t20_n2_n2_30m', 'bbands_lowerband_t20_n2_n2_30m', 'rsi_t7_1h', 'rsi_t14_1h', 'rsi_t28_1h', 'roc_t4_1h', 'roc_t8_1h', 'roc_t16_1h', 'roc_t32_1h', 'macd_macd_f8_s21_s9_1h', 'macd_macd_f12_s26_s9_1h', 'macd_macdsignal_f8_s21_s9_1h', 'macd_macdsignal_f12_s26_s9_1h', 'macd_macdhist_f8_s21_s9_1h', 'macd_macdhist_f12_s26_s9_1h', 'atr_t8_1h', 'atr_t16_1h', 'atr_t32_1h', 'bbands_upperband_t20_n2_n2_1h', 'bbands_middleband_t20_n2_n2_1h', 'bbands_lowerband_t20_n2_n2_1h', 'rsi_t7_4h', 'rsi_t14_4h', 'rsi_t28_4h', 'atr_t8_4h', 'atr_t16_4h', 'atr_t32_4h', 'bbands_upperband_t20_n2_n2_4h', 'bbands_middleband_t20_n2_n2_4h', 'bbands_lowerband_t20_n2_n2_4h']
+2025-08-27 00:20:55,363 - ERROR - Traceback (most recent call last):
+  File "/Users/mac-main/Neural-Forecast/.circleci/scripts/validate_feature_engineering.py", line 320, in generate_feature_artifacts
+    df_sample.to_parquet(sample_path, index=False)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/pandas/util/_decorators.py", line 333, in wrapper
+    return func(*args, **kwargs)
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/pandas/core/frame.py", line 3113, in to_parquet
+    return to_parquet(
+        self,
+    ...<6 lines>...
+        **kwargs,
+    )
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/pandas/io/parquet.py", line 480, in to_parquet
+    impl.write(
+    ~~~~~~~~~~^
+        df,
+        ^^^
+    ...<6 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    )
+    ^
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/pandas/io/parquet.py", line 190, in write
+    table = self.api.Table.from_pandas(df, **from_pandas_kwargs)
+  File "pyarrow/table.pxi", line 4795, in pyarrow.lib.Table.from_pandas
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/pyarrow/pandas_compat.py", line 594, in dataframe_to_arrays
+    convert_fields) = _get_columns_to_convert(df, schema, preserve_index,
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                              columns)
+                                              ^^^^^^^^
+  File "/Users/mac-main/Neural-Forecast/.venv/lib/python3.13/site-packages/pyarrow/pandas_compat.py", line 374, in _get_columns_to_convert
+    raise ValueError(
+        f'Duplicate column names found: {list(df.columns)}'
+    )
+ValueError: Duplicate column names found: ['ds', 'ds', 'roc_t4', 'roc_t8', 'roc_t16', 'roc_t32', 'obv', 'mfi_t14', 'donchian_DCL_20_20_l20_u20', 'donchian_DCM_20_20_l20_u20', 'donchian_DCU_20_20_l20_u20', 'minute_of_day', 'day_of_week', 'rsi_t7_30m', 'rsi_t14_30m', 'rsi_t28_30m', 'roc_t4_30m', 'roc_t8_30m', 'roc_t16_30m', 'roc_t32_30m', 'atr_t8_30m', 'atr_t16_30m', 'atr_t32_30m', 'bbands_upperband_t20_n2_n2_30m', 'bbands_middleband_t20_n2_n2_30m', 'bbands_lowerband_t20_n2_n2_30m', 'rsi_t7_1h', 'rsi_t14_1h', 'rsi_t28_1h', 'roc_t4_1h', 'roc_t8_1h', 'roc_t16_1h', 'roc_t32_1h', 'macd_macd_f8_s21_s9_1h', 'macd_macd_f12_s26_s9_1h', 'macd_macdsignal_f8_s21_s9_1h', 'macd_macdsignal_f12_s26_s9_1h', 'macd_macdhist_f8_s21_s9_1h', 'macd_macdhist_f12_s26_s9_1h', 'atr_t8_1h', 'atr_t16_1h', 'atr_t32_1h', 'bbands_upperband_t20_n2_n2_1h', 'bbands_middleband_t20_n2_n2_1h', 'bbands_lowerband_t20_n2_n2_1h', 'rsi_t7_4h', 'rsi_t14_4h', 'rsi_t28_4h', 'atr_t8_4h', 'atr_t16_4h', 'atr_t32_4h', 'bbands_upperband_t20_n2_n2_4h', 'bbands_middleband_t20_n2_n2_4h', 'bbands_lowerband_t20_n2_n2_4h']
+
+2025-08-27 00:20:55,363 - ERROR - Failed to generate feature artifacts
+2025-08-27 00:25:23,140 - INFO - Starting Feature Engineering Validation
+2025-08-27 00:25:23,140 - INFO - === Feature Registry Validation ===
+2025-08-27 00:25:23,141 - INFO - Total indicators in registry: 13
+2025-08-27 00:25:23,141 - INFO - Historical indicators: 10 - ['rsi', 'roc', 'stoch_k', 'macd', 'atr', 'nvol', 'obv', 'mfi', 'bbands', 'donchian']
+2025-08-27 00:25:23,141 - INFO - Future indicators: 3 - ['minute_of_day', 'day_of_week', 'is_weekend']
+2025-08-27 00:25:23,141 - INFO - MTF targets configured: 3 timeframes
+2025-08-27 00:25:23,141 - INFO -   30m: ['rsi', 'roc', 'atr', 'bbands']
+2025-08-27 00:25:23,141 - INFO -   1h: ['rsi', 'roc', 'atr', 'bbands', 'macd']
+2025-08-27 00:25:23,141 - INFO -   4h: ['rsi', 'atr', 'bbands']
+2025-08-27 00:25:23,141 - INFO - ✓ Feature registry validation passed
+2025-08-27 00:25:23,141 - INFO - === Feature Computation Validation ===
+2025-08-27 00:25:24,300 - INFO - Loading processed BTC data...
+2025-08-27 00:25:27,503 - INFO - Loaded 477464 rows of canonical data
+2025-08-27 00:25:27,503 - INFO - Computing base 15-minute indicators...
+2025-08-27 00:25:37,660 - INFO - Generated 30 base indicator columns
+2025-08-27 00:25:37,660 - INFO - Sample indicator columns: ['rsi_t7', 'rsi_t14', 'rsi_t28', 'roc_t4', 'roc_t8', 'roc_t16', 'roc_t32', 'stoch_k_slowk_f14_s3_s3', 'stoch_k_slowd_f14_s3_s3', 'macd_macd_f8_s21_s9']
+2025-08-27 00:25:37,661 - INFO - ✓ Found 3 columns for rsi_
+2025-08-27 00:25:37,661 - INFO - ✓ Found 4 columns for roc_
+2025-08-27 00:25:37,661 - INFO - ✓ Found 3 columns for atr_
+2025-08-27 00:25:37,661 - INFO - ✓ Found 6 columns for macd_
+2025-08-27 00:25:37,661 - INFO - ✓ Found 1 columns for bbands_
+2025-08-27 00:25:37,661 - INFO - ✓ Found 1 columns for obv
+2025-08-27 00:25:37,661 - INFO - ✓ Found 1 columns for mfi_
+2025-08-27 00:25:37,661 - INFO - Computing multi-timeframe indicators...
+2025-08-27 00:25:42,196 - INFO - Generated 41 MTF indicator columns
+2025-08-27 00:25:42,196 - WARNING - No MTF columns found for timeframe _30min
+2025-08-27 00:25:42,196 - INFO - ✓ Found 19 columns for timeframe _1h
+2025-08-27 00:25:42,196 - INFO - ✓ Found 9 columns for timeframe _4h
+2025-08-27 00:25:42,196 - INFO - Combining base and MTF indicators...
+2025-08-27 00:25:42,301 - INFO - Total combined features before processing: 71
+2025-08-27 00:25:42,301 - INFO - ✓ Feature computation validation passed
+2025-08-27 00:25:42,309 - INFO - === Shift Discipline and Leakage Prevention Validation ===
+2025-08-27 00:25:42,310 - INFO - Applying shift(1) and pruning...
+2025-08-27 00:25:42,834 - INFO - Features after shift and pruning: 52
+2025-08-27 00:25:42,834 - INFO - Historical columns to validate for shift: 50
+2025-08-27 00:25:42,893 - INFO - Testing leakage detection with assert_shifted...
+2025-08-27 00:25:43,187 - INFO - ✓ No leakage detected in historical features
+2025-08-27 00:25:43,187 - INFO - Future columns (should not be shifted): 2
+2025-08-27 00:25:43,187 - INFO - ✓ Shift discipline validation passed
+2025-08-27 00:25:43,193 - INFO - === Feature Selection Validation ===
+2025-08-27 00:25:43,193 - INFO - Testing feature selection with 256 cap...
+2025-08-27 00:26:52,658 - INFO - Selected features: 28 total
+2025-08-27 00:26:52,658 - INFO -   Historical: 26
+2025-08-27 00:26:52,658 - INFO -   Future: 2
+2025-08-27 00:26:52,659 - INFO -   Static: 0
+2025-08-27 00:26:52,659 - INFO - ✓ Feature selection validation passed
+2025-08-27 00:26:52,659 - INFO - === MTF Alignment Validation ===
+2025-08-27 00:26:52,659 - INFO - Loading data for MTF alignment testing...
+2025-08-27 00:26:55,498 - INFO - Using 1000 rows for MTF testing
+2025-08-27 00:26:55,546 - INFO - ✓ MTF alignment validation passed
+2025-08-27 00:26:55,550 - INFO - === Generating Feature Engineering Artifacts ===
+2025-08-27 00:26:55,582 - INFO - Saved feature sample: artifacts/feature_engineering/feature_sample_20250827T002655Z.parquet
+2025-08-27 00:26:55,582 - INFO - Saved feature metadata: artifacts/feature_engineering/feature_metadata_20250827T002655Z.json
+2025-08-27 00:26:55,583 - INFO - Saved validation report: artifacts/feature_engineering/feature_validation_report_20250827T002655Z.md
+2025-08-27 00:26:55,583 - INFO - ✓ Feature engineering artifacts generated successfully
+2025-08-27 00:26:55,583 - INFO - === Feature Engineering Validation Completed Successfully ===

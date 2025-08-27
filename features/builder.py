@@ -8,8 +8,7 @@ except ImportError:
 import vectorbt as vbt
 from typing import Dict, List, Tuple
 from .registry import REGISTRY, MTF_TARGETS, IndicatorSpec
-from technical.util import resample_to_interval, resampled_merge  # freqtrade technical
-# ^ provides reliable resample+merge utilities for higher TFs → base TF forward-fill. 
+# Using pandas resampling for MTF computation 
 
 # ---------- 3.2.1 Base-TF compute (15m) ----------
 def _compute_talib(df: pd.DataFrame, spec: IndicatorSpec) -> pd.DataFrame:
@@ -103,7 +102,7 @@ def build_indicators(df_ohlcv_15m: pd.DataFrame, registry=REGISTRY) -> pd.DataFr
     base = df_ohlcv_15m.set_index("ds").sort_index()
     frames = []
     for spec in registry:
-        if spec.tf != "15min":  # base compute only 15m here
+        if spec.tf != "15m":  # base compute only 15m here
             continue
         if spec.kind == "stat":  # handled elsewhere as constants
             continue
@@ -131,9 +130,25 @@ def build_indicators(df_ohlcv_15m: pd.DataFrame, registry=REGISTRY) -> pd.DataFr
 def _compute_mtf_one(df_ohlcv_15m: pd.DataFrame, tf: str, names: List[str]) -> pd.DataFrame:
     """Resample OHLCV to tf, compute subset of indicators, then merge down to 15m."""
     base = df_ohlcv_15m.copy()
-    # 1) Up-sample: resample_to_interval builds a higher-TF OHLCV DataFrame (EOB aligned).
-    df_hi = resample_to_interval(base.set_index("ds"), tf)  # returns columns with suffixes like 'close'
-    df_hi = df_hi.reset_index().rename(columns={"date":"ds"}) if "date" in df_hi.columns else df_hi.reset_index()
+    
+    # 1) Up-sample using pandas resampling (simpler approach)
+    base_indexed = base.set_index("ds")
+    
+    # Map timeframe to pandas frequency
+    tf_map = {"30m": "30min", "1h": "1h", "4h": "4h"}
+    pandas_freq = tf_map.get(tf, tf)
+    
+    # Resample OHLCV data to higher timeframe
+    df_hi = base_indexed.resample(pandas_freq, label='right', closed='right').agg({
+        'open': 'first',
+        'high': 'max', 
+        'low': 'min',
+        'close': 'last',
+        'volume': 'sum'
+    }).dropna()
+    
+    df_hi = df_hi.reset_index()
+    
     # 2) Compute indicators on higher TF
     frames = [df_hi[["ds"]].copy()]
     for spec in REGISTRY:
@@ -149,12 +164,20 @@ def _compute_mtf_one(df_ohlcv_15m: pd.DataFrame, tf: str, names: List[str]) -> p
         # Prefix with TF to avoid collisions, e.g., rsi_1h_p14
         dfi.columns = [f"{c}_{tf}" for c in dfi.columns]
         frames.append(dfi.reset_index())
+    
+    if len(frames) == 1:
+        return frames[0]  # Only ds column
+        
     hi_feats = frames[0]
     for fr in frames[1:]:
         hi_feats = hi_feats.merge(fr, on="ds", how="left")
-    # 3) Merge down to 15m with forward-fill inside each hi-TF bar
-    #    resampled_merge aligns EOB and fills until next hi-TF close. 
-    merged = resampled_merge(df_ohlcv_15m, hi_feats.set_index("ds"), tf).reset_index().rename(columns={"index":"ds"})
+    
+    # 3) Merge down to 15m with forward-fill
+    # Use pandas merge_asof for time-based forward fill
+    base_sorted = df_ohlcv_15m[["ds"]].sort_values("ds")
+    hi_feats_sorted = hi_feats.sort_values("ds")
+    
+    merged = pd.merge_asof(base_sorted, hi_feats_sorted, on="ds", direction="backward")
     return merged[[c for c in merged.columns if c not in ["open","high","low","close","volume"]]]
 
 def apply_mtf(df_ohlcv_15m: pd.DataFrame, registry=REGISTRY) -> pd.DataFrame:
