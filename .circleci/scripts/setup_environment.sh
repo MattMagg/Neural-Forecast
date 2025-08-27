@@ -231,23 +231,25 @@ setup_python_environment() {
     log_success "Python version requirement satisfied"
     
     # Create virtual environment if not cached
-    if [ ! -d ".venv" ]; then
-        log_info "Creating new virtual environment..."
-        python -m venv .venv || {
-            log_error "Failed to create virtual environment"
-            log_error "Diagnostic: $(python -m venv --help | head -3)"
+    local venv_path="${PWD}/.venv"
+    if [ ! -d "$venv_path" ]; then
+        log_info "Creating new virtual environment at: $venv_path"
+        python -m venv "$venv_path" || {
+            log_error "Failed to create virtual environment at $venv_path"
+            log_error "Current directory: $(pwd)"
+            log_error "Directory contents: $(ls -la | head -5)"
             exit 1
         }
-        log_success "Virtual environment created"
+        log_success "Virtual environment created at $venv_path"
     else
-        log_info "Using cached virtual environment"
+        log_info "Using cached virtual environment at $venv_path"
     fi
     
     # Activate virtual environment
-    source .venv/bin/activate || {
+    source "$venv_path/bin/activate" || {
         log_error "Failed to activate virtual environment"
         log_error "Virtual environment may be corrupted"
-        rm -rf .venv
+        rm -rf "$venv_path"
         exit 1
     }
     
