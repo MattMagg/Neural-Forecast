@@ -3,7 +3,7 @@
 
 # Core ML & Forecasting
 neuralforecast==3.0.2
-torch==2.6.0  # NeuralForecast 3.0.2 requires torch<=2.6.0
+torch==2.8.0  # NeuralForecast 3.0.2 requires torch<=2.6.0
 pytorch-lightning==2.4.0  # Compatible with torch 2.6.0
 
 # Data Processing
