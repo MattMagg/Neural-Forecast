@@ -23,26 +23,88 @@ jobs:
       with:
         python-version: ${{ env.PYTHON_VERSION }}
     
+    - name: Cache Python dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pip
+          ~/.local/lib/python${{ env.PYTHON_VERSION }}/site-packages
+        key: ${{ runner.os }}-python-${{ env.PYTHON_VERSION }}-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-python-${{ env.PYTHON_VERSION }}-
+          ${{ runner.os }}-python-
+    
+    - name: Cache APT packages
+      uses: actions/cache@v4
+      with:
+        path: /var/cache/apt
+        key: ${{ runner.os }}-apt-${{ hashFiles('.github/workflows/ci.yml') }}
+        restore-keys: |
+          ${{ runner.os }}-apt-
+    
+    - name: Cache TA-Lib installation
+      id: cache-talib
+      uses: actions/cache@v4
+      with:
+        path: |
+          /usr/local/lib/libta_lib*
+          /usr/local/include/ta-lib/
+          /usr/local/bin/ta-lib-config
+        key: ${{ runner.os }}-talib-0.4.0-v2
+        restore-keys: |
+          ${{ runner.os }}-talib-0.4.0-
+    
+    - name: Cache status report
+      run: |
+        echo "=== Cache Status Report ==="
+        echo "TA-Lib cache hit: ${{ steps.cache-talib.outputs.cache-hit }}"
+        echo "Python cache paths:"
+        echo "  - ~/.cache/pip"
+        echo "  - ~/.local/lib/python${{ env.PYTHON_VERSION }}/site-packages"
+        echo "=========================="
+    
     - name: Install system dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y build-essential wget gfortran libopenblas-dev
-        
-        # TA-Lib C library installation from source
+    
+    - name: Install TA-Lib (if not cached)
+      if: steps.cache-talib.outputs.cache-hit != 'true'
+      run: |
+        echo "TA-Lib not found in cache, installing from source..."
+        start_time=$(date +%s)
         wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
         tar -xzf ta-lib-0.4.0-src.tar.gz
         cd ta-lib/
         CFLAGS="-Wno-format-security" ./configure --prefix=/usr/local
         make
         sudo make install
-        sudo ldconfig
         cd ..
         rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
+        end_time=$(date +%s)
+        echo "TA-Lib installation completed in $((end_time - start_time)) seconds"
+    
+    - name: TA-Lib cache hit confirmation
+      if: steps.cache-talib.outputs.cache-hit == 'true'
+      run: |
+        echo "✓ TA-Lib restored from cache - significant time saved!"
+        ls -la /usr/local/lib/libta_lib* || echo "Checking TA-Lib files..."
+        ls -la /usr/local/include/ta-lib/ || echo "Checking TA-Lib headers..."
+    
+    - name: Configure TA-Lib (always run)
+      run: |
+        sudo ldconfig
+        echo "TA-Lib configuration completed"
     
     - name: Upgrade pip and install Python dependencies
       run: |
+        echo "Installing Python dependencies..."
+        start_time=$(date +%s)
         python -m pip install --upgrade pip setuptools wheel
-        pip install --no-cache-dir -r requirements.txt
+        # Use pip cache for faster installs
+        pip install -r requirements.txt
+        end_time=$(date +%s)
+        echo "Python dependencies installed in $((end_time - start_time)) seconds"
     
     - name: Basic import validation
       run: |
