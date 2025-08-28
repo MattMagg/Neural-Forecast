@@ -8,11 +8,12 @@ on:
   workflow_dispatch:
 
 env:
-  PYTHON_VERSION: "3.13"
+  PYTHON_VERSION: "3.12"
 
 jobs:
   basic-validation:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     
     steps:
     - name: Checkout repository
@@ -101,8 +102,8 @@ jobs:
         echo "Installing Python dependencies..."
         start_time=$(date +%s)
         python -m pip install --upgrade pip setuptools wheel
-        # Use pip cache for faster installs
-        pip install -r requirements.txt
+        # Use minimal CI requirements for faster, more reliable builds
+        pip install -r requirements-ci.txt
         end_time=$(date +%s)
         echo "Python dependencies installed in $((end_time - start_time)) seconds"
     
@@ -113,11 +114,11 @@ jobs:
         import sys
         packages = [
             ('talib', 'TA-Lib'),
-            ('neuralforecast', 'NeuralForecast'),
             ('pandas', 'Pandas'),
             ('numpy', 'NumPy'),
-            ('torch', 'PyTorch'),
-            ('vectorbt', 'VectorBT')
+            ('sklearn', 'Scikit-learn'),
+            ('pyarrow', 'PyArrow'),
+            ('yaml', 'PyYAML')
         ]
         
         failed = []
