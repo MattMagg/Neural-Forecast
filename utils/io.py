@@ -16,6 +16,7 @@ import json
 import tempfile
 import shutil
 import logging
+import warnings
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional, Dict, List, Any, Union
@@ -482,6 +483,153 @@ def load_and_process_data(filepath: str = "data/raw/btcusd_1-min_data.csv") -> p
     nf_df = make_nf_canonical(df_15min)
     
     return nf_df
+
+
+def safe_feature_merge(df_canonical: pd.DataFrame, 
+                      feat_df: pd.DataFrame, 
+                      merge_strategy: str = 'left',
+                      on_column: Optional[str] = None) -> pd.DataFrame:
+    """
+    Safely merge features avoiding column conflicts, especially 'ds' column.
+    
+    This function implements the safe feature merge pattern to handle:
+    - Duplicate 'ds' columns (canonical is authoritative)
+    - Other column conflicts with suffix handling
+    - Index-based or column-based merging
+    - Proper logging of conflicts and resolutions
+    
+    Args:
+        df_canonical: Main DataFrame (canonical data with 'ds' column)
+        feat_df: Features DataFrame to merge
+        merge_strategy: Merge strategy ('left', 'inner', 'outer', 'right')
+        on_column: Column to merge on (default: None for index-based merge)
+        
+    Returns:
+        DataFrame with safely merged features
+        
+    Raises:
+        ValueError: If DataFrames are incompatible for merging
+        
+    Example:
+        >>> # Merge features with canonical data
+        >>> df_merged = safe_feature_merge(df_canonical, features_df)
+        
+        >>> # Merge on specific column
+        >>> df_merged = safe_feature_merge(df_canonical, features_df, on_column='ds')
+    """
+    if df_canonical.empty or feat_df.empty:
+        logging.warning("One of the DataFrames is empty, returning canonical DataFrame")
+        return df_canonical.copy()
+    
+    # Make copies to avoid modifying originals
+    df_canonical_work = df_canonical.copy()
+    feat_df_work = feat_df.copy()
+    
+    # 1. Identify conflicting columns
+    conflicts = set(df_canonical_work.columns) & set(feat_df_work.columns)
+    
+    if conflicts:
+        logging.info(f"Found {len(conflicts)} conflicting columns: {sorted(conflicts)}")
+    
+    # 2. Handle 'ds' column specifically (canonical is authoritative)
+    if 'ds' in conflicts:
+        logging.info("Removing 'ds' column from features DataFrame (canonical is authoritative)")
+        feat_df_work = feat_df_work.drop(columns=['ds'])
+        conflicts.remove('ds')
+        
+        # If we were going to merge on 'ds', switch to index-based merge
+        if on_column == 'ds':
+            logging.info("Switching to index-based merge since 'ds' was removed from features")
+            on_column = None
+    
+    # 3. Prepare for merge based on strategy
+    if on_column:
+        # Column-based merge
+        if on_column not in df_canonical_work.columns:
+            raise ValueError(f"Merge column '{on_column}' not found in canonical DataFrame")
+        if on_column not in feat_df_work.columns:
+            raise ValueError(f"Merge column '{on_column}' not found in features DataFrame")
+        
+        # Handle remaining conflicts with suffixes
+        if conflicts:
+            logging.info(f"Handling {len(conflicts)} remaining conflicts with suffixes")
+            df_merged = pd.merge(
+                df_canonical_work, 
+                feat_df_work,
+                on=on_column,
+                how=merge_strategy,
+                suffixes=('', '_feat')
+            )
+        else:
+            # Clean merge without conflicts
+            df_merged = pd.merge(
+                df_canonical_work,
+                feat_df_work,
+                on=on_column,
+                how=merge_strategy
+            )
+    else:
+        # Index-based merge
+        # Ensure both DataFrames have compatible indices
+        if not df_canonical_work.index.equals(feat_df_work.index):
+            logging.warning("Index mismatch detected, attempting to align indices")
+            
+            # Try to align on 'ds' column if available
+            if 'ds' in df_canonical_work.columns and 'ds' in feat_df_work.columns:
+                df_canonical_work = df_canonical_work.set_index('ds')
+                feat_df_work = feat_df_work.set_index('ds')
+                logging.info("Aligned indices using 'ds' column")
+            else:
+                logging.warning("Cannot align indices - proceeding with current indices")
+        
+        # Handle remaining conflicts with suffixes
+        if conflicts:
+            logging.info(f"Handling {len(conflicts)} remaining conflicts with suffixes")
+            df_merged = pd.merge(
+                df_canonical_work,
+                feat_df_work,
+                left_index=True,
+                right_index=True,
+                how=merge_strategy,
+                suffixes=('', '_feat')
+            )
+        else:
+            # Clean merge without conflicts
+            df_merged = pd.merge(
+                df_canonical_work,
+                feat_df_work,
+                left_index=True,
+                right_index=True,
+                how=merge_strategy
+            )
+        
+        # Reset index if we set it for merging
+        if 'ds' in df_merged.index.names:
+            df_merged = df_merged.reset_index()
+    
+    # 4. Validate merge results
+    original_canonical_rows = len(df_canonical_work)
+    merged_rows = len(df_merged)
+    
+    if merge_strategy == 'left' and merged_rows != original_canonical_rows:
+        warnings.warn(f"Left merge changed row count: {original_canonical_rows} → {merged_rows}")
+    
+    # Check for data loss in canonical columns
+    canonical_cols = df_canonical_work.columns
+    for col in canonical_cols:
+        if col in df_merged.columns:
+            original_non_null = df_canonical_work[col].notna().sum()
+            merged_non_null = df_merged[col].notna().sum()
+            if merged_non_null < original_non_null:
+                warnings.warn(f"Data loss detected in column '{col}': {original_non_null} → {merged_non_null} non-null values")
+    
+    # 5. Log merge summary
+    added_cols = [col for col in df_merged.columns if col not in df_canonical_work.columns]
+    logging.info(f"Merge completed: added {len(added_cols)} feature columns")
+    if added_cols:
+        logging.debug(f"Added columns: {sorted(added_cols)}")
+    
+    return df_merged
 
 
 def drop_train_nans_and_winsorize(nf_df: pd.DataFrame, lower_q: float = 0.001, upper_q: float = 0.999) -> pd.DataFrame:

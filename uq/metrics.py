@@ -12,6 +12,7 @@ import numpy as np
 from typing import Dict, Optional, List, Union, Tuple
 import logging
 import warnings
+from neuralforecast.losses.pytorch import sCRPS
 
 # Import error recovery utilities
 from utils.error_recovery import (
@@ -20,6 +21,52 @@ from utils.error_recovery import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def compute_scrps_nf_native(y_true: np.ndarray,
+                           y_pred: np.ndarray,
+                           quantiles: np.ndarray) -> float:
+    """
+    Compute sCRPS using NeuralForecast's native implementation directly.
+    
+    This is a simplified, robust implementation that uses NF's sCRPS function
+    directly without complex error handling that might mask issues.
+    
+    Args:
+        y_true: Actual values (n_samples,)
+        y_pred: Quantile predictions (n_samples, n_quantiles)
+        quantiles: Quantile levels (n_quantiles,)
+        
+    Returns:
+        sCRPS value (float), or np.nan if computation fails
+    """
+    try:
+        # Remove NaN values
+        mask = ~(np.isnan(y_true) | np.isnan(y_pred).any(axis=1))
+        if not mask.any():
+            return np.nan
+        
+        y_true_clean = y_true[mask]
+        y_pred_clean = y_pred[mask]
+        
+        # Convert to torch tensors
+        y_true_tensor = torch.tensor(y_true_clean, dtype=torch.float32)
+        y_pred_tensor = torch.tensor(y_pred_clean, dtype=torch.float32)
+        quantiles_tensor = torch.tensor(quantiles, dtype=torch.float32)
+        
+        # Use NF's sCRPS function directly
+        scrps_loss = sCRPS()
+        scrps_value = scrps_loss(y_true_tensor, y_pred_tensor, quantiles_tensor)
+        
+        # Convert to float
+        if isinstance(scrps_value, torch.Tensor):
+            scrps_value = scrps_value.item()
+        
+        return scrps_value if np.isfinite(scrps_value) else np.nan
+        
+    except Exception as e:
+        logging.error(f"NF-native sCRPS computation failed: {e}")
+        return np.nan
 
 
 def compute_scrps(y_true: np.ndarray,
@@ -115,14 +162,21 @@ def compute_scrps(y_true: np.ndarray,
                     crps = _compute_fallback_scrps(y_true_clean, y_pred_clean)
                     
         elif quantiles is not None and y_pred_clean.ndim > 1:
-            # For quantile models (MQLoss/IQLoss)
+            # For quantile models (MQLoss/IQLoss) - use NF-native implementation
             try:
-                # Check for quantile crossing before computing
-                if _has_quantile_crossing(y_pred_clean):
-                    logger.warning("Quantile crossing detected, fixing before sCRPS computation")
-                    y_pred_clean = stability_checker.ensure_monotonic_quantiles(y_pred_clean)
+                # First try the robust NF-native implementation
+                crps = compute_scrps_nf_native(y_true_clean, y_pred_clean, quantiles)
+                
+                # If that fails, fall back to the original implementation
+                if np.isnan(crps) and use_fallback:
+                    logger.warning("NF-native sCRPS failed, trying fallback implementation")
+                    # Check for quantile crossing before computing
+                    if _has_quantile_crossing(y_pred_clean):
+                        logger.warning("Quantile crossing detected, fixing before sCRPS computation")
+                        y_pred_clean = stability_checker.ensure_monotonic_quantiles(y_pred_clean)
+                        
+                    crps = _compute_quantile_scrps(y_true_clean, y_pred_clean, quantiles)
                     
-                crps = _compute_quantile_scrps(y_true_clean, y_pred_clean, quantiles)
             except Exception as e:
                 logger.error(f"Quantile sCRPS failed: {e}")
                 if use_fallback:

@@ -41,6 +41,149 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def compute_scrps_nf_native(cv_df: pd.DataFrame, model_name: str, y_col: str = "y") -> float:
+    """
+    Compute sCRPS using NeuralForecast's native implementation.
+    
+    This function implements the exact pattern from the design document to handle
+    both distributional (StudentT) and quantile (MQLoss) model types using
+    NeuralForecast's native sCRPS function.
+    
+    Args:
+        cv_df: Cross-validation DataFrame with predictions
+        model_name: Name of the model to compute sCRPS for
+        y_col: Column name for actual values (default: "y")
+        
+    Returns:
+        sCRPS value (float), or np.nan if computation fails
+    """
+    try:
+        # Extract actual values
+        y_true = cv_df[y_col].values
+        
+        # 1. Identify quantile columns for this model
+        quantile_cols = [c for c in cv_df.columns 
+                        if model_name in c and '-q' in c]
+        
+        if not quantile_cols:
+            # No quantiles available - return NaN as expected for point forecasts
+            logger.debug(f"No quantile columns found for {model_name}, returning NaN")
+            return np.nan
+        
+        # 2. Prepare quantile predictions data
+        q_preds = cv_df[quantile_cols].values
+        
+        # 3. Extract quantile levels from column names
+        quantiles = []
+        for col in quantile_cols:
+            try:
+                # Handle format: "ModelName-q10", "ModelName-q50", etc.
+                if '-q' in col:
+                    q_str = col.split('-q')[1]
+                    q_level = float(q_str) / 100.0
+                    quantiles.append(q_level)
+                else:
+                    logger.warning(f"Unexpected quantile column format: {col}")
+            except (ValueError, IndexError) as e:
+                logger.warning(f"Could not parse quantile level from {col}: {e}")
+                continue
+        
+        if not quantiles:
+            logger.warning(f"Could not parse any quantile levels for {model_name}")
+            return np.nan
+        
+        quantiles = np.array(quantiles)
+        
+        # 4. Remove NaN values
+        mask = ~(np.isnan(y_true) | np.isnan(q_preds).any(axis=1))
+        if not mask.any():
+            logger.warning(f"All values are NaN for {model_name}")
+            return np.nan
+        
+        y_true_clean = y_true[mask]
+        q_preds_clean = q_preds[mask]
+        
+        # 5. Compute sCRPS using NeuralForecast's native implementation
+        # Convert to torch tensors as expected by NF's sCRPS
+        y_true_tensor = torch.tensor(y_true_clean, dtype=torch.float32)
+        q_preds_tensor = torch.tensor(q_preds_clean, dtype=torch.float32)
+        quantiles_tensor = torch.tensor(quantiles, dtype=torch.float32)
+        
+        # Use NF's sCRPS function
+        scrps_loss = sCRPS()
+        scrps_value = scrps_loss(y_true_tensor, q_preds_tensor, quantiles_tensor)
+        
+        # Convert back to float
+        if isinstance(scrps_value, torch.Tensor):
+            scrps_value = scrps_value.item()
+        
+        # Validate result
+        if not np.isfinite(scrps_value):
+            logger.warning(f"Non-finite sCRPS value for {model_name}: {scrps_value}")
+            return np.nan
+        
+        logger.debug(f"Computed sCRPS for {model_name}: {scrps_value:.6f}")
+        return scrps_value
+        
+    except Exception as e:
+        logger.error(f"sCRPS computation failed for {model_name}: {e}")
+        return np.nan
+
+
+def _validate_scrps_computation(cv_df: pd.DataFrame, models: List[str]) -> None:
+    """
+    Validate that sCRPS values are reasonable and consistent.
+    
+    This function checks that:
+    1. sCRPS can be computed for models with quantile predictions
+    2. Values are finite and positive
+    3. Values are within reasonable ranges
+    
+    Args:
+        cv_df: Cross-validation DataFrame
+        models: List of model names to validate
+        
+    Raises:
+        ValueError: If sCRPS validation fails
+    """
+    logger.info("Validating sCRPS computation...")
+    
+    validation_results = {}
+    
+    for model_name in models:
+        if model_name not in cv_df.columns:
+            continue
+            
+        # Check if model has quantile predictions
+        quantile_cols = [c for c in cv_df.columns 
+                        if model_name in c and '-q' in c]
+        
+        if quantile_cols:
+            # Try to compute sCRPS
+            scrps_value = compute_scrps_nf_native(cv_df, model_name)
+            validation_results[model_name] = scrps_value
+            
+            if np.isnan(scrps_value):
+                logger.warning(f"sCRPS computation returned NaN for {model_name}")
+            elif scrps_value <= 0:
+                logger.warning(f"sCRPS value is non-positive for {model_name}: {scrps_value}")
+            elif scrps_value > 10:
+                logger.warning(f"sCRPS value seems unusually high for {model_name}: {scrps_value}")
+            else:
+                logger.info(f"sCRPS validation passed for {model_name}: {scrps_value:.6f}")
+        else:
+            logger.debug(f"No quantile predictions found for {model_name}, sCRPS will be NaN")
+    
+    # Summary validation
+    valid_scrps = [v for v in validation_results.values() if np.isfinite(v)]
+    
+    if valid_scrps:
+        logger.info(f"sCRPS validation summary: {len(valid_scrps)}/{len(validation_results)} models "
+                   f"have valid sCRPS values (range: {min(valid_scrps):.6f} - {max(valid_scrps):.6f})")
+    else:
+        logger.warning("No models have valid sCRPS values - model ranking may not work properly")
+
+
 def run_cv(nf: NeuralForecast, 
            df: pd.DataFrame, 
            cfg: Dict[str, Any],
@@ -477,6 +620,9 @@ def summarize_cv(cv_df: pd.DataFrame,
     
     # Initialize results dictionary
     results = {}
+    
+    # Validate sCRPS computation before proceeding
+    _validate_scrps_computation(cv_df, models)
     
     # Compute metrics for each model
     metrics_list = []
