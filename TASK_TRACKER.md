@@ -2,9 +2,9 @@
 
 ## Project Metadata
 
-**Current Version**: 0.5.2.11  
-**Last Updated**: 2025-08-27  
-**Branch**: instance-training-v0.5.2.X
+**Current Version**: 0.5.2.12  
+**Last Updated**: 2025-09-04  
+**Branch**: baseline-v0.5.2.X
 
 ## Specifications Status
 
@@ -19,6 +19,7 @@
 | thunder-compute-setup | COMPLETED | 3/3 | Pre-installed software compatibility, setup automation |
 | training-guide-vscode-optimization | COMPLETED | 1/1 | Foundation workflow documentation complete |
 | circleci-foundation-setup | COMPLETED | 7/7 | Complete CI/CD foundation with GPU support, validation jobs, caching system |
+| critical-bug-fixes | COMPLETED | 4/4 | Fixed duplicate column conflicts and sCRPS computation issues |
 
 ## Update Instructions
 
@@ -81,6 +82,60 @@ When updating this document:
 ---
 
 # CHANGELOG (Latest First)
+
+---
+
+## Critical Bug Fixes (Issues #3 and #4)
+
+**Status**: COMPLETED  
+**Version**: 0.5.2.12  
+**Date**: 2025-09-04  
+**Spec Location**: `.kiro/specs/critical-bug-fixes/`  
+**Tags**: [SCRIPT] [VALIDATION] [BUG-FIX]
+
+### Summary
+Fixed critical blocking bugs that prevented pipeline execution: duplicate column conflicts in feature merging and sCRPS computation returning NaN instead of actual values.
+
+### Tasks Completed
+- [x] **Safe Feature Merge Function**: Implemented `safe_feature_merge()` in utils/io.py **[SCRIPT]**
+  - Handles duplicate 'ds' columns (canonical is authoritative)
+  - Automatic conflict detection and resolution with suffixes
+  - Pre/post-merge data integrity validation
+  - Files affected: `utils/io.py`
+  - Functions created: safe_feature_merge()
+
+- [x] **Feature Integration Pipeline Fix**: Updated training pipeline to use safe merging **[SCRIPT]**
+  - Replaced direct pandas merge with safe_feature_merge()
+  - Added import and updated merge operations
+  - Files affected: `run_train.ipynb`
+  - Key changes: Two critical merge operations now use safe merging
+
+- [x] **sCRPS Computation Implementation**: Proper sCRPS using NF's native implementation **[SCRIPT]**
+  - Added compute_scrps_nf_native() function using neuralforecast.losses.pytorch.sCRPS
+  - Enhanced existing sCRPS computation with NF-native fallback
+  - Handles both distributional (StudentT) and quantile (MQLoss) model types
+  - Files affected: `cv/runner.py`, `uq/metrics.py`
+  - Functions created: compute_scrps_nf_native(), _validate_scrps_computation()
+
+- [x] **sCRPS Aggregation and Model Ranking**: Validation and ranking improvements **[VALIDATION]**
+  - Added comprehensive sCRPS validation framework
+  - Verified proper aggregation across CV windows
+  - Enhanced model ranking by sCRPS_mean
+  - Files affected: `cv/runner.py`
+  - Key changes: Added validation before CV summarization
+
+### Files Created/Modified
+- `utils/io.py` - Added safe_feature_merge() function with comprehensive conflict handling
+- `run_train.ipynb` - Updated feature integration to use safe merging
+- `cv/runner.py` - Added NF-native sCRPS computation and validation functions
+- `uq/metrics.py` - Enhanced sCRPS computation with NF-native fallback
+
+### Issues Resolved
+- **GitHub Issue #3**: Duplicate 'ds' column causing feature integration failure (CLOSED)
+- **GitHub Issue #4**: sCRPS metric returning NaN instead of actual values (CLOSED)
+
+### Next Steps
+Pipeline execution is now unblocked and ready for GPU training with proper model evaluation.
 
 ---
 
