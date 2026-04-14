@@ -17,4 +17,4 @@ pyyaml==6.0.2
 tqdm==4.67.1
 
 # Testing
-pytest==8.4.1
+pytest==9.0.3

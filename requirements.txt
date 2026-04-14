@@ -39,5 +39,5 @@ tqdm==4.67.1
 psutil==6.1.1  # System monitoring for metrics module
 
 # Testing
-pytest==8.4.1
+pytest==9.0.3
 pytest-cov==6.0.0
