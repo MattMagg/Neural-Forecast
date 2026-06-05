@@ -4,7 +4,7 @@
 # Core Data Processing (lightweight)
 pandas==2.3.1
 numpy==2.3.2
-pyarrow==20.0.0
+pyarrow==23.0.1
 
 # TA-Lib (requires system installation first)
 TA-Lib==0.5.0
